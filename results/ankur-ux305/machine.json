@@ -1,0 +1,9 @@
+{
+    "arch": "x86_64",
+    "cpu": "Intel(R) Core(TM) i7-6500U CPU @ 2.50GHz",
+    "machine": "ankur-ux305",
+    "num_cpu": "4",
+    "os": "Linux 5.4.0-26-generic",
+    "ram": "8046716",
+    "version": 1
+}
