@@ -64,7 +64,7 @@
         "warmup_time": -1
     },
     "readwrite.TimeRead.time_asia_read": {
-        "code": "class TimeRead:\n    def time_asia_read(self):\n        BIFReader('asia.bif').get_model()\n\n    def setup(self):\n        self.asia = BIFReader('asia.bif').get_model()\n        self.munin = BIFReader('munin.bif').get_model()\n        self.pathfinder = BIFReader('pathfinder.bif').get_model()",
+        "code": "class TimeRead:\n    def time_asia_read(self):\n        get_example_model('asia')\n\n    def setup(self):\n        self.asia = get_example_model('asia')\n        self.munin = get_example_model('munin')\n        self.pathfinder = get_example_model('pathfinder')",
         "min_run_count": 2,
         "name": "readwrite.TimeRead.time_asia_read",
         "number": 0,
@@ -76,11 +76,11 @@
         "timeout": 60.0,
         "type": "time",
         "unit": "seconds",
-        "version": "668b335bab30affcd697c0d15685df0fe598250b08e8573d8cf6a1d93169f18f",
+        "version": "00ee50175421b36358b2284cbbaaf9e6caad1078a142202d8afbc8a5431e3d42",
         "warmup_time": -1
     },
     "readwrite.TimeRead.time_asia_write": {
-        "code": "class TimeRead:\n    def time_asia_write(self):\n        BIFWriter(self.asia).write_bif('\\tmp')\n\n    def setup(self):\n        self.asia = BIFReader('asia.bif').get_model()\n        self.munin = BIFReader('munin.bif').get_model()\n        self.pathfinder = BIFReader('pathfinder.bif').get_model()",
+        "code": "class TimeRead:\n    def time_asia_write(self):\n        BIFWriter(self.asia).write_bif('\\tmp')\n\n    def setup(self):\n        self.asia = get_example_model('asia')\n        self.munin = get_example_model('munin')\n        self.pathfinder = get_example_model('pathfinder')",
         "min_run_count": 2,
         "name": "readwrite.TimeRead.time_asia_write",
         "number": 0,
@@ -92,11 +92,11 @@
         "timeout": 60.0,
         "type": "time",
         "unit": "seconds",
-        "version": "5f31d5bbe2680377995ca55ef4797edff6cab958ec67996ac32b85807bd02ff9",
+        "version": "6b23702a30f46b24f31ce56f640429a894ab62a5f2644da15763d9698ca06dd4",
         "warmup_time": -1
     },
     "readwrite.TimeRead.time_munin_read": {
-        "code": "class TimeRead:\n    def time_munin_read(self):\n        BIFReader('munin.bif').get_model()\n\n    def setup(self):\n        self.asia = BIFReader('asia.bif').get_model()\n        self.munin = BIFReader('munin.bif').get_model()\n        self.pathfinder = BIFReader('pathfinder.bif').get_model()",
+        "code": "class TimeRead:\n    def time_munin_read(self):\n        get_example_model('munin')\n\n    def setup(self):\n        self.asia = get_example_model('asia')\n        self.munin = get_example_model('munin')\n        self.pathfinder = get_example_model('pathfinder')",
         "min_run_count": 2,
         "name": "readwrite.TimeRead.time_munin_read",
         "number": 0,
@@ -108,11 +108,11 @@
         "timeout": 60.0,
         "type": "time",
         "unit": "seconds",
-        "version": "a0b3aef76d69ea5c7c5543b97d464cbc8032da60114095298318c2cf01a0f8ed",
+        "version": "bf56520cd7d0afbd0aeb4f693d91093132666189d9704b5fa557da1164506529",
         "warmup_time": -1
     },
     "readwrite.TimeRead.time_munin_write": {
-        "code": "class TimeRead:\n    def time_munin_write(self):\n        BIFWriter(self.munin).write_bif('\\tmp')\n\n    def setup(self):\n        self.asia = BIFReader('asia.bif').get_model()\n        self.munin = BIFReader('munin.bif').get_model()\n        self.pathfinder = BIFReader('pathfinder.bif').get_model()",
+        "code": "class TimeRead:\n    def time_munin_write(self):\n        BIFWriter(self.munin).write_bif('\\tmp')\n\n    def setup(self):\n        self.asia = get_example_model('asia')\n        self.munin = get_example_model('munin')\n        self.pathfinder = get_example_model('pathfinder')",
         "min_run_count": 2,
         "name": "readwrite.TimeRead.time_munin_write",
         "number": 0,
@@ -124,11 +124,11 @@
         "timeout": 60.0,
         "type": "time",
         "unit": "seconds",
-        "version": "70f73503bba885086d0658ef9de9570f1f4a8fcea80bdd056eede9f7d056db3a",
+        "version": "bfbe73d230ae1b37c4fbfbc360be8367ce771b72ffaf78ad32604f393fac0f4d",
         "warmup_time": -1
     },
     "readwrite.TimeRead.time_pathfinder_read": {
-        "code": "class TimeRead:\n    def time_pathfinder_read(self):\n        BIFReader('pathfinder.bif').get_model()\n\n    def setup(self):\n        self.asia = BIFReader('asia.bif').get_model()\n        self.munin = BIFReader('munin.bif').get_model()\n        self.pathfinder = BIFReader('pathfinder.bif').get_model()",
+        "code": "class TimeRead:\n    def time_pathfinder_read(self):\n        get_example_model('pathfinder')\n\n    def setup(self):\n        self.asia = get_example_model('asia')\n        self.munin = get_example_model('munin')\n        self.pathfinder = get_example_model('pathfinder')",
         "min_run_count": 2,
         "name": "readwrite.TimeRead.time_pathfinder_read",
         "number": 0,
@@ -140,11 +140,11 @@
         "timeout": 60.0,
         "type": "time",
         "unit": "seconds",
-        "version": "d2b3570cf392988caa2e0c77d5f879fb4e4a633e4e2bede2e948e116026b2b2f",
+        "version": "a603f5c5619a5360146c5c5aa9307b9d792df6d3932faa44d90d3b270b6f66eb",
         "warmup_time": -1
     },
     "readwrite.TimeRead.time_pathfinder_write": {
-        "code": "class TimeRead:\n    def time_pathfinder_write(self):\n        BIFWriter(self.pathfinder).write_bif('\\tmp')\n\n    def setup(self):\n        self.asia = BIFReader('asia.bif').get_model()\n        self.munin = BIFReader('munin.bif').get_model()\n        self.pathfinder = BIFReader('pathfinder.bif').get_model()",
+        "code": "class TimeRead:\n    def time_pathfinder_write(self):\n        BIFWriter(self.pathfinder).write_bif('\\tmp')\n\n    def setup(self):\n        self.asia = get_example_model('asia')\n        self.munin = get_example_model('munin')\n        self.pathfinder = get_example_model('pathfinder')",
         "min_run_count": 2,
         "name": "readwrite.TimeRead.time_pathfinder_write",
         "number": 0,
@@ -156,7 +156,7 @@
         "timeout": 60.0,
         "type": "time",
         "unit": "seconds",
-        "version": "546b9c293d237215209d4d4cad0223bad3d60c23d0a11d571d7b3e464c295c6d",
+        "version": "6c7561cbd54f97bdd12c71950c46921d86f5e962246d9ca8c4182c8abb22cde5",
         "warmup_time": -1
     },
     "sampling.TimeSampling.time_forward_sample": {
