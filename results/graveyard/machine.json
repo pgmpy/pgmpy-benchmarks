@@ -1,0 +1,9 @@
+{
+    "arch": "x86_64",
+    "cpu": "Intel(R) Core(TM) i9-9820X CPU @ 3.30GHz",
+    "machine": "graveyard",
+    "num_cpu": "20",
+    "os": "Linux 4.15.0-112-generic",
+    "ram": "131688676",
+    "version": 1
+}

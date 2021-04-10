@@ -63,6 +63,38 @@
         "version": "b8454f897532cbfc3dc91dd442b9d4429c7671f8720779f25b6975fed7999d6c",
         "warmup_time": -1
     },
+    "inference.TimeVariableElimination.time_query_alarm": {
+        "code": "class TimeVariableElimination:\n    def time_query_alarm(self):\n        infer = VariableElimination(self.alarm)\n        infer.query(variables=['VENTLUNG', 'VENTALV', 'ARTCO2', 'CATECHOL'])\n\n    def setup(self):\n        self.alarm = get_example_model('alarm')\n        self.munin = get_example_model('munin')",
+        "min_run_count": 2,
+        "name": "inference.TimeVariableElimination.time_query_alarm",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 60.0,
+        "type": "time",
+        "unit": "seconds",
+        "version": "4f4aca0c4d029f458791f2444cae6bacf18251d2d465b1cc3492e4e32c07beec",
+        "warmup_time": -1
+    },
+    "inference.TimeVariableElimination.time_query_munin": {
+        "code": "class TimeVariableElimination:\n    def time_query_munin(self):\n        infer = VariableElimination(self.munin)\n        infer.query(variables=['L_LNLC8_ADM_MALOSS', 'L_LNLLP_ADM_MALOSS', 'L_LNLC8_LP_ADM_MALOSS', 'L_LNLE_ADM_MALOSS'])\n\n    def setup(self):\n        self.alarm = get_example_model('alarm')\n        self.munin = get_example_model('munin')",
+        "min_run_count": 2,
+        "name": "inference.TimeVariableElimination.time_query_munin",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 60.0,
+        "type": "time",
+        "unit": "seconds",
+        "version": "3c25bd77115999cfba0644b479e5b10cea7897bdaa8f985e5dfa2b24c8c34ee0",
+        "warmup_time": -1
+    },
     "readwrite.TimeRead.time_asia_read": {
         "code": "class TimeRead:\n    def time_asia_read(self):\n        get_example_model('asia')\n\n    def setup(self):\n        self.asia = get_example_model('asia')\n        self.munin = get_example_model('munin')\n        self.pathfinder = get_example_model('pathfinder')",
         "min_run_count": 2,
