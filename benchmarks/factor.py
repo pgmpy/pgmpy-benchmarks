@@ -15,3 +15,6 @@ class TimeDiscreteFactor:
 
     def time_factor_multiply_large(self):
         phi = self.phi_large * self.phi_large
+
+    def time_factor_compare(self):
+        self.phi_large == self.phi_large

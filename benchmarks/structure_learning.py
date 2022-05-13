@@ -3,13 +3,12 @@ from pgmpy.sampling import BayesianModelSampling
 from pgmpy.utils import get_example_model
 
 
-class TimePC:
+class TimePCAlarmModel:
     timeout = 600.0
 
     def setup(self):
         model = get_example_model('alarm')
-        self.s = BayesianModelSampling(model)
-        samples = self.s.forward_sample(size=int(1e4))
+        samples = model.simulate(size=int(1e4), seed=42)
         self.est = PC(samples)
 
     def time_pc_stable(self):
@@ -19,15 +18,38 @@ class TimePC:
         self.est.estimate(variant='orig')
 
 
-class TimeHillClimb:
+class TimeHillClimbAlarmModel:
     timeout = 600.0
 
     def setup(self):
         model = get_example_model('alarm')
-        self.samples = BayesianModelSampling(model).forward_sample(size=int(1e4))
-        scoring_method = K2Score(self.samples)
-        est = HillClimbSearch(data=self.samples, scoring_method=scoring_method)
+        samples = model.simulate(size=int(1e4), seed=42)
+        self.scoring_method = K2Score(samples)
+        est = HillClimbSearch(data=samples)
 
     def time_hillclimb(self):
-        est.estimate(max_indegree=4, max_iter=int(1e4))
+        est.estimate(max_indegree=4, scoring_method=self.scoring_method, max_iter=int(1e4))
 
+
+class TimeTreeSearchAlarmModel:
+    timeout = 600.0
+
+    def setup(self):
+        model = get_example_model('alarm')
+        samples = model.simulate(size=int(1e4))
+        self.est = TreeSearch(samples)
+
+    def time_tan(self):
+        self.est.estimate(estimator_type="tan", class_node="HISTORY", show_progress=False)
+
+
+class TimeMmhcAlarmModel:
+    timeout = 600.0
+
+    def setup(self):
+        model = get_example_model('alarm')
+        samples = model.simulate(size=int(1e4))
+        self.est = TreeSearch(samples)
+
+    def time_mmhc(self):
+        self.est.estimate()
