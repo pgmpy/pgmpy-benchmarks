@@ -17,12 +17,12 @@ class TimeVariableElimination:
 
 
 class TimeBeliefPropagation:
-    timeout = 600
+    timeout = 600   
 
     def setup(self):
         self.alarm = get_example_model('alarm')
 
     def time_query_alarm(self):
         infer = BeliefPropagation(self.alarm)
-        infer.query(variables=['VENTLUNG', 'VENTALV', 'ARTCO2', 'CATECHOL'])
+        infer.query(variables=['VENTLUNG'])
 
