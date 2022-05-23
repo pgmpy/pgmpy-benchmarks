@@ -10,10 +10,10 @@ class TimeSampling:
         self.s = BayesianModelSampling(self.model)
 
     def time_forward_sample(self):
-        self.model.simulate(n_samples=int(1e4))
+        self.model.simulate(n_samples=int(1e4), show_progress=False)
 
     def time_rejection_sample(self):
-        self.model.simulate(n_samples=int(1e4), evidence=[("HISTORY", "TRUE"), ("HR", "NORMAL")])
+        self.model.simulate(n_samples=int(1e4), evidence=[("HISTORY", "TRUE"), ("HR", "NORMAL")], show_progress=False)
 
     def time_likelihood_sample(self):
         self.s.likelihood_weighted_sample(evidence=[("HISTORY", "TRUE"), ("HR", "NORMAL")], size=int(1e4))
