@@ -16,14 +16,14 @@ class TimeMLE:
         self.munin_est = MaximumLikelihoodEstimator(self.munin_model, self.munin.simulate(int(1e4)))
 
     def time_alarm_mle(self):
-        self.alarm_est.get_parameter()
+        self.alarm_est.get_parameters()
 
     def time_munin_mle(self):
-        self.munin_est.get_parameter()
+        self.munin_est.get_parameters()
 
 
 class TimeBayesianEstimator:
-    timeout = 600
+    timeout = 1200
 
     def setup(self):
         self.alarm = get_example_model('alarm')
@@ -35,10 +35,10 @@ class TimeBayesianEstimator:
         self.munin_est = BayseianEstimator(self.munin_model, self.munin.simulate(int(1e4)))
 
     def time_alarm_bayesian_estimator(self):
-        self.alarm_est.get_parameter()
+        self.alarm_est.get_parameters()
 
     def time_munin_bayesian_estimator(self):
-        self.munin_est.get_parameter()
+        self.munin_est.get_parameters()
 
 
 class TimeExpectationMaximization:
@@ -54,8 +54,8 @@ class TimeExpectationMaximization:
         self.munin_est = ExpectationMaximization(self.munin_model, self.munin.simulate(int(1e4)))
 
     def time_alarm_em(self):
-        self.alarm_est.get_parameter()
+        self.alarm_est.get_parameters()
 
     def time_munin_em(self):
-        self.munin_est.get_parameter()
+        self.munin_est.get_parameters()
 

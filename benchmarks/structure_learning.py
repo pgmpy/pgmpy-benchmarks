@@ -8,7 +8,7 @@ class TimePCAlarmModel:
 
     def setup(self):
         model = get_example_model('alarm')
-        samples = model.simulate(size=int(1e4), seed=42)
+        samples = model.simulate(n_samples=int(1e4), seed=42)
         self.est = PC(samples)
 
     def time_pc_stable(self):
@@ -23,7 +23,7 @@ class TimeHillClimbAlarmModel:
 
     def setup(self):
         model = get_example_model('alarm')
-        samples = model.simulate(size=int(1e4), seed=42)
+        samples = model.simulate(n_samples=int(1e4), seed=42)
         self.scoring_method = K2Score(samples)
         est = HillClimbSearch(data=samples)
 
@@ -36,7 +36,7 @@ class TimeTreeSearchAlarmModel:
 
     def setup(self):
         model = get_example_model('alarm')
-        samples = model.simulate(size=int(1e4))
+        samples = model.simulate(n_samples=int(1e4))
         self.est = TreeSearch(samples)
 
     def time_tan(self):
@@ -48,8 +48,8 @@ class TimeMmhcAlarmModel:
 
     def setup(self):
         model = get_example_model('alarm')
-        samples = model.simulate(size=int(1e4))
-        self.est = TreeSearch(samples)
+        samples = model.simulate(n_samples=int(1e4))
+        self.est = MmhcEstimator(samples)
 
     def time_mmhc(self):
         self.est.estimate()
