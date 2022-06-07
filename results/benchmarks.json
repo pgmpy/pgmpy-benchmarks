@@ -1,4 +1,20 @@
 {
+    "factor.TimeDiscreteFactor.time_factor_compare": {
+        "code": "class TimeDiscreteFactor:\n    def time_factor_compare(self):\n        self.phi_large == self.phi_large\n\n    def setup(self):\n        self.phi_large = DiscreteFactor(range(10), [2] * 10, [1] * (2**10))",
+        "min_run_count": 2,
+        "name": "factor.TimeDiscreteFactor.time_factor_compare",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 60.0,
+        "type": "time",
+        "unit": "seconds",
+        "version": "95feb42df85ffe5cf519cf4af677309a5cdb891db99ad54b655196c3e1f2e13a",
+        "warmup_time": -1
+    },
     "factor.TimeDiscreteFactor.time_factor_marginalize": {
         "code": "class TimeDiscreteFactor:\n    def time_factor_marginalize(self):\n        self.phi_large.marginalize([4, 5, 8], inplace=False)\n\n    def setup(self):\n        self.phi_large = DiscreteFactor(range(10), [2] * 10, [1] * (2**10))",
         "min_run_count": 2,
@@ -63,6 +79,22 @@
         "version": "b8454f897532cbfc3dc91dd442b9d4429c7671f8720779f25b6975fed7999d6c",
         "warmup_time": -1
     },
+    "inference.TimeBeliefPropagation.time_query_alarm": {
+        "code": "class TimeBeliefPropagation:\n    def time_query_alarm(self):\n        infer = BeliefPropagation(self.alarm)\n        infer.query(variables=['VENTLUNG'])\n\n    def setup(self):\n        self.alarm = get_example_model('alarm')",
+        "min_run_count": 2,
+        "name": "inference.TimeBeliefPropagation.time_query_alarm",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 600,
+        "type": "time",
+        "unit": "seconds",
+        "version": "6680f8e9b1d1b599be3036d23a934dfdc9403b143056adb5edc9ccbe1dec7caa",
+        "warmup_time": -1
+    },
     "inference.TimeVariableElimination.time_query_alarm": {
         "code": "class TimeVariableElimination:\n    def time_query_alarm(self):\n        infer = VariableElimination(self.alarm)\n        infer.query(variables=['VENTLUNG', 'VENTALV', 'ARTCO2', 'CATECHOL'])\n\n    def setup(self):\n        self.alarm = get_example_model('alarm')\n        self.munin = get_example_model('munin')",
         "min_run_count": 2,
@@ -93,6 +125,102 @@
         "type": "time",
         "unit": "seconds",
         "version": "3c25bd77115999cfba0644b479e5b10cea7897bdaa8f985e5dfa2b24c8c34ee0",
+        "warmup_time": -1
+    },
+    "parameter_learning.TimeBayesianEstimator.time_alarm_bayesian_estimator": {
+        "code": "class TimeBayesianEstimator:\n    def time_alarm_bayesian_estimator(self):\n        self.alarm_est.get_parameters()\n\n    def setup(self):\n        self.alarm = get_example_model('alarm')\n        self.alarm_model = BayesianNetwork(self.alarm.edges())\n        self.alarm_est = BayesianEstimator(self.alarm_model, self.alarm.simulate(int(1e4), show_progress=False))\n    \n        self.munin = get_example_model('munin1')\n        self.munin_model = BayesianNetwork(self.munin.edges())\n        self.munin_est = BayesianEstimator(self.munin_model, self.munin.simulate(int(1e4), show_progress=False))",
+        "min_run_count": 2,
+        "name": "parameter_learning.TimeBayesianEstimator.time_alarm_bayesian_estimator",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 1200,
+        "type": "time",
+        "unit": "seconds",
+        "version": "106af0208af2afb3d7f371b0c64176d86ce0c835aa02a8beddfb59256c6623a6",
+        "warmup_time": -1
+    },
+    "parameter_learning.TimeBayesianEstimator.time_munin_bayesian_estimator": {
+        "code": "class TimeBayesianEstimator:\n    def time_munin_bayesian_estimator(self):\n        self.munin_est.get_parameters()\n\n    def setup(self):\n        self.alarm = get_example_model('alarm')\n        self.alarm_model = BayesianNetwork(self.alarm.edges())\n        self.alarm_est = BayesianEstimator(self.alarm_model, self.alarm.simulate(int(1e4), show_progress=False))\n    \n        self.munin = get_example_model('munin1')\n        self.munin_model = BayesianNetwork(self.munin.edges())\n        self.munin_est = BayesianEstimator(self.munin_model, self.munin.simulate(int(1e4), show_progress=False))",
+        "min_run_count": 2,
+        "name": "parameter_learning.TimeBayesianEstimator.time_munin_bayesian_estimator",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 1200,
+        "type": "time",
+        "unit": "seconds",
+        "version": "373f9e1e0851fac0c2f2ddd3d57b349e107851ad63aca3348a58089dc3435cec",
+        "warmup_time": -1
+    },
+    "parameter_learning.TimeExpectationMaximization.time_alarm_em": {
+        "code": "class TimeExpectationMaximization:\n    def time_alarm_em(self):\n        self.alarm_est.get_parameters()\n\n    def setup(self):\n        self.alarm = get_example_model('alarm')\n        self.alarm_model = BayesianNetwork(self.alarm.edges())\n        self.alarm_est = ExpectationMaximization(self.alarm_model, self.alarm.simulate(int(1e4), show_progress=False))\n    \n        self.munin = get_example_model('munin1')\n        self.munin_model = BayesianNetwork(self.munin.edges())\n        self.munin_est = ExpectationMaximization(self.munin_model, self.munin.simulate(int(1e4), show_progress=False))",
+        "min_run_count": 2,
+        "name": "parameter_learning.TimeExpectationMaximization.time_alarm_em",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 600,
+        "type": "time",
+        "unit": "seconds",
+        "version": "1a6a6614c0eafcd32e0ee0b7739885def047daa4e34928c375836888ee06b288",
+        "warmup_time": -1
+    },
+    "parameter_learning.TimeExpectationMaximization.time_munin_em": {
+        "code": "class TimeExpectationMaximization:\n    def time_munin_em(self):\n        self.munin_est.get_parameters()\n\n    def setup(self):\n        self.alarm = get_example_model('alarm')\n        self.alarm_model = BayesianNetwork(self.alarm.edges())\n        self.alarm_est = ExpectationMaximization(self.alarm_model, self.alarm.simulate(int(1e4), show_progress=False))\n    \n        self.munin = get_example_model('munin1')\n        self.munin_model = BayesianNetwork(self.munin.edges())\n        self.munin_est = ExpectationMaximization(self.munin_model, self.munin.simulate(int(1e4), show_progress=False))",
+        "min_run_count": 2,
+        "name": "parameter_learning.TimeExpectationMaximization.time_munin_em",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 600,
+        "type": "time",
+        "unit": "seconds",
+        "version": "ad9277dacc6234e1b5f25f548c63afd1dbd4ba62c74b7ce13c67339dad05d86d",
+        "warmup_time": -1
+    },
+    "parameter_learning.TimeMLE.time_alarm_mle": {
+        "code": "class TimeMLE:\n    def time_alarm_mle(self):\n        self.alarm_est.get_parameters()\n\n    def setup(self):\n        self.alarm = get_example_model('alarm')\n        self.alarm_model = BayesianNetwork(self.alarm.edges())\n        self.alarm_est = MaximumLikelihoodEstimator(self.alarm_model, self.alarm.simulate(int(1e4), show_progress=False))\n    \n        self.munin = get_example_model('munin1')\n        self.munin_model = BayesianNetwork(self.munin.edges())\n        self.munin_est = MaximumLikelihoodEstimator(self.munin_model, self.munin.simulate(int(1e4), show_progress=False))",
+        "min_run_count": 2,
+        "name": "parameter_learning.TimeMLE.time_alarm_mle",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 600,
+        "type": "time",
+        "unit": "seconds",
+        "version": "1674d8d67071c6958371be05e00ec82a462da24cc714d710f2b5cc1fb90ea86d",
+        "warmup_time": -1
+    },
+    "parameter_learning.TimeMLE.time_munin_mle": {
+        "code": "class TimeMLE:\n    def time_munin_mle(self):\n        self.munin_est.get_parameters()\n\n    def setup(self):\n        self.alarm = get_example_model('alarm')\n        self.alarm_model = BayesianNetwork(self.alarm.edges())\n        self.alarm_est = MaximumLikelihoodEstimator(self.alarm_model, self.alarm.simulate(int(1e4), show_progress=False))\n    \n        self.munin = get_example_model('munin1')\n        self.munin_model = BayesianNetwork(self.munin.edges())\n        self.munin_est = MaximumLikelihoodEstimator(self.munin_model, self.munin.simulate(int(1e4), show_progress=False))",
+        "min_run_count": 2,
+        "name": "parameter_learning.TimeMLE.time_munin_mle",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 600,
+        "type": "time",
+        "unit": "seconds",
+        "version": "19b4acbbef089493e92bc85c98d526d42e1b11aaa0db75a32bebd3e9b4f7b696",
         "warmup_time": -1
     },
     "readwrite.TimeRead.time_asia_read": {
@@ -192,7 +320,7 @@
         "warmup_time": -1
     },
     "sampling.TimeSampling.time_forward_sample": {
-        "code": "class TimeSampling:\n    def time_forward_sample(self):\n        self.s.forward_sample(size=int(1e4))\n\n    def setup(self):\n        self.model = get_example_model('alarm')\n        self.s = BayesianModelSampling(self.model)",
+        "code": "class TimeSampling:\n    def time_forward_sample(self):\n        self.model.simulate(n_samples=int(1e4), show_progress=False)\n\n    def setup(self):\n        self.model = get_example_model('alarm')\n        self.s = BayesianModelSampling(self.model)",
         "min_run_count": 2,
         "name": "sampling.TimeSampling.time_forward_sample",
         "number": 0,
@@ -204,7 +332,7 @@
         "timeout": 600.0,
         "type": "time",
         "unit": "seconds",
-        "version": "0ea380c0fe8a8131a802a270f53e62da34837522727ab5a9413ce81f5ac2bffb",
+        "version": "35b4d4940e380f94846369d5ba08b91efdeecfee726e8395f3e3fc210524a94e",
         "warmup_time": -1
     },
     "sampling.TimeSampling.time_gibbs_sampling": {
@@ -240,7 +368,7 @@
         "warmup_time": -1
     },
     "sampling.TimeSampling.time_rejection_sample": {
-        "code": "class TimeSampling:\n    def time_rejection_sample(self):\n        self.s.rejection_sample(evidence=[(\"HISTORY\", \"TRUE\"), (\"HR\", \"NORMAL\")], size=int(1e4))\n\n    def setup(self):\n        self.model = get_example_model('alarm')\n        self.s = BayesianModelSampling(self.model)",
+        "code": "class TimeSampling:\n    def time_rejection_sample(self):\n        self.model.simulate(n_samples=int(1e4), evidence={\"HISTORY\": \"TRUE\", \"HR\": \"NORMAL\"}, show_progress=False)\n\n    def setup(self):\n        self.model = get_example_model('alarm')\n        self.s = BayesianModelSampling(self.model)",
         "min_run_count": 2,
         "name": "sampling.TimeSampling.time_rejection_sample",
         "number": 0,
@@ -252,13 +380,13 @@
         "timeout": 600.0,
         "type": "time",
         "unit": "seconds",
-        "version": "1246c8af155cc0a2db8d6a7daca8e062bcf5f2e0afd4c564bb19a65d21aed4da",
+        "version": "57f423dcc2567e066c495aedc4bb084168538ccad1b5ae925a338062d1070c5d",
         "warmup_time": -1
     },
-    "structure_learning.TimeHillClimb.time_hillclimb": {
-        "code": "class TimeHillClimb:\n    def time_hillclimb(self):\n        est.estimate(max_indegree=4, max_iter=int(1e4))\n\n    def setup(self):\n        model = get_example_model('alarm')\n        self.samples = BayesianModelSampling(model).forward_sample(size=int(1e4))\n        scoring_method = K2Score(self.samples)\n        est = HillClimbSearch(data=self.samples, scoring_method=scoring_method)",
+    "structure_learning.TimeHillClimbAlarmModel.time_hillclimb": {
+        "code": "class TimeHillClimbAlarmModel:\n    def time_hillclimb(self):\n        self.est.estimate(max_indegree=4, scoring_method=self.scoring_method, max_iter=int(1e4))\n\n    def setup(self):\n        model = get_example_model('alarm')\n        samples = model.simulate(n_samples=int(1e4), seed=42, show_progress=False)\n        self.scoring_method = K2Score(samples)\n        self.est = HillClimbSearch(data=samples)",
         "min_run_count": 2,
-        "name": "structure_learning.TimeHillClimb.time_hillclimb",
+        "name": "structure_learning.TimeHillClimbAlarmModel.time_hillclimb",
         "number": 0,
         "param_names": [],
         "params": [],
@@ -268,13 +396,13 @@
         "timeout": 600.0,
         "type": "time",
         "unit": "seconds",
-        "version": "8ff6ea5990c046c4dfab297898cf6a57ff81a2c8b58e8d272917a3497b27ec8b",
+        "version": "cd1e5e2c19100a1cd0eec909cb3dbe734f037488bca448673de5f8ae438ead8c",
         "warmup_time": -1
     },
-    "structure_learning.TimePC.time_pc_orig": {
-        "code": "class TimePC:\n    def time_pc_orig(self):\n        self.est.estimate(variant='orig')\n\n    def setup(self):\n        model = get_example_model('alarm')\n        self.s = BayesianModelSampling(model)\n        samples = self.s.forward_sample(size=int(1e4))\n        self.est = PC(samples)",
+    "structure_learning.TimeMmhcAlarmModel.time_mmhc": {
+        "code": "class TimeMmhcAlarmModel:\n    def time_mmhc(self):\n        self.est.estimate()\n\n    def setup(self):\n        model = get_example_model('alarm')\n        samples = model.simulate(n_samples=int(1e4), show_progress=False)\n        self.est = MmhcEstimator(samples)",
         "min_run_count": 2,
-        "name": "structure_learning.TimePC.time_pc_orig",
+        "name": "structure_learning.TimeMmhcAlarmModel.time_mmhc",
         "number": 0,
         "param_names": [],
         "params": [],
@@ -284,13 +412,13 @@
         "timeout": 600.0,
         "type": "time",
         "unit": "seconds",
-        "version": "d9de7bbd7c35a34e7b84a5fd2c2e6da9b5300987ed40c008d7515e11cd38a6c2",
+        "version": "7458e15f5001986a0e9b80d4aca02aacc9cb48c48642ca926ac1853609b4d0c1",
         "warmup_time": -1
     },
-    "structure_learning.TimePC.time_pc_stable": {
-        "code": "class TimePC:\n    def time_pc_stable(self):\n        self.est.estimate(variant='stable')\n\n    def setup(self):\n        model = get_example_model('alarm')\n        self.s = BayesianModelSampling(model)\n        samples = self.s.forward_sample(size=int(1e4))\n        self.est = PC(samples)",
+    "structure_learning.TimePCAlarmModel.time_pc_orig": {
+        "code": "class TimePCAlarmModel:\n    def time_pc_orig(self):\n        self.est.estimate(variant='orig')\n\n    def setup(self):\n        model = get_example_model('alarm')\n        samples = model.simulate(n_samples=int(1e4), seed=42, show_progress=False)\n        self.est = PC(samples)",
         "min_run_count": 2,
-        "name": "structure_learning.TimePC.time_pc_stable",
+        "name": "structure_learning.TimePCAlarmModel.time_pc_orig",
         "number": 0,
         "param_names": [],
         "params": [],
@@ -300,7 +428,39 @@
         "timeout": 600.0,
         "type": "time",
         "unit": "seconds",
-        "version": "e241d1e8b9c0c9daf2eaa78b9808996236e0aa980f7d6cdc9de17f76c10a7d06",
+        "version": "bccd0e25da5679e44fe8544e41ae2ed7cae86d57c027383171f89f1ab81aeb7d",
+        "warmup_time": -1
+    },
+    "structure_learning.TimePCAlarmModel.time_pc_stable": {
+        "code": "class TimePCAlarmModel:\n    def time_pc_stable(self):\n        self.est.estimate(variant='stable')\n\n    def setup(self):\n        model = get_example_model('alarm')\n        samples = model.simulate(n_samples=int(1e4), seed=42, show_progress=False)\n        self.est = PC(samples)",
+        "min_run_count": 2,
+        "name": "structure_learning.TimePCAlarmModel.time_pc_stable",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 600.0,
+        "type": "time",
+        "unit": "seconds",
+        "version": "aa7de744d5d0e962bfde31360e911bec11432052fae1a9bc185681c057f0a7b5",
+        "warmup_time": -1
+    },
+    "structure_learning.TimeTreeSearchAlarmModel.time_tan": {
+        "code": "class TimeTreeSearchAlarmModel:\n    def time_tan(self):\n        self.est.estimate(estimator_type=\"tan\", class_node=\"HISTORY\", show_progress=False)\n\n    def setup(self):\n        model = get_example_model('alarm')\n        samples = model.simulate(n_samples=int(1e4), show_progress=False)\n        self.est = TreeSearch(samples)",
+        "min_run_count": 2,
+        "name": "structure_learning.TimeTreeSearchAlarmModel.time_tan",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "processes": 2,
+        "repeat": 0,
+        "sample_time": 0.01,
+        "timeout": 600.0,
+        "type": "time",
+        "unit": "seconds",
+        "version": "c66ced109919424a10f47cba1f9fc2900b657c48a9e239ee81719efa5cc570d5",
         "warmup_time": -1
     },
     "version": 2
