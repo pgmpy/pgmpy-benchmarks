@@ -259,7 +259,7 @@ $(document).ready(function() {
             $('#even-spacing').removeClass('active');
             update_state_url({'x-axis-scale': date_scale ? ['date'] : []});
         });
-        
+
         $('#show-legend').on('click', function(evt) {
             show_legend = !show_legend;
             update_state_url({'show-legend': show_legend ? [] : [false]});
@@ -352,7 +352,7 @@ $(document).ready(function() {
         if (!state || state_selection !== null) {
             /*
                Setup the default configuration on first load,
-               or when state selector is present 
+               or when state selector is present
             */
             state = {};
             state.machine = index.params.machine;
@@ -828,6 +828,15 @@ $(document).ready(function() {
         var failures = 0;
         var count = 1;
 
+        if (to_load.length === 0) {
+            $('#main-graph').html("<div style='display: flex;" +
+                "justify-content: center;" +
+                " align-items: center; height: 100%;'>" +
+                "<p style='font-size: 2rem;'>No graphs to load.</p>" +
+                "</div>")
+            return
+        }
+
         current_revisions = [];
         $.each(to_load, function(i, item) {
             $.asv.load_graph_data(
@@ -1135,7 +1144,7 @@ $(document).ready(function() {
                     });
                     if (revs.length > 1) {
                         markings.push(
-                            { color: "rgba(200, 0, 0, 0.2)", alpha: 0.5, lineWidth: 2, 
+                            { color: "rgba(200, 0, 0, 0.2)", alpha: 0.5, lineWidth: 2,
                               xaxis: { from: Math.min.apply(null, x_values),
                                        to: Math.max.apply(null, x_values) }}
                         );
@@ -1392,7 +1401,7 @@ $(document).ready(function() {
             }
             delete params['x-axis-scale'];
         }
-    
+
         var show_legend_button = $('#show-legend')
         if (params['show-legend']) {
             if (params['show-legend'][0] === 'false') {
