@@ -18,3 +18,6 @@ class TimeDiscreteFactor:
 
     def time_factor_compare(self):
         self.phi_large == self.phi_large
+
+    def time_copy(self):
+        self.phi_large.copy()

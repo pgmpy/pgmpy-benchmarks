@@ -7,7 +7,6 @@ class TimeSampling:
 
     def setup(self):
         self.model = get_example_model('alarm')
-        self.s = BayesianModelSampling(self.model)
 
     def time_forward_sample(self):
         self.model.simulate(n_samples=int(1e4), show_progress=False)

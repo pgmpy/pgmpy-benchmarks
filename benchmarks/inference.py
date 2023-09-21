@@ -17,7 +17,7 @@ class TimeVariableElimination:
 
 
 class TimeBeliefPropagation:
-    timeout = 600   
+    timeout = 600
 
     def setup(self):
         self.alarm = get_example_model('alarm')

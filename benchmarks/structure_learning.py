@@ -17,6 +17,9 @@ class TimePCAlarmModel:
     def time_pc_orig(self):
         self.est.estimate(variant='orig')
 
+    def time_pc_parallel(self):
+        self.est.estimate(variant='parallel')
+
 
 class TimeHillClimbAlarmModel:
     timeout = 600.0
@@ -42,14 +45,3 @@ class TimeTreeSearchAlarmModel:
     def time_tan(self):
         self.est.estimate(estimator_type="tan", class_node="HISTORY", show_progress=False)
 
-
-# class TimeMmhcAlarmModel:
-#     timeout = 600.0
-# 
-#     def setup(self):
-#         model = get_example_model('alarm')
-#         samples = model.simulate(n_samples=int(1e4), show_progress=False)
-#         self.est = MmhcEstimator(samples)
-# 
-#     def time_mmhc(self):
-#         self.est.estimate()
