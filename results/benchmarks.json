@@ -1,4 +1,19 @@
 {
+    "factor.TimeDiscreteFactor.time_copy": {
+        "code": "class TimeDiscreteFactor:\n    def time_copy(self):\n        self.phi_large.copy()\n\n    def setup(self):\n        self.phi_large = DiscreteFactor(range(10), [2] * 10, [1] * (2**10))",
+        "min_run_count": 2,
+        "name": "factor.TimeDiscreteFactor.time_copy",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "repeat": 0,
+        "rounds": 2,
+        "sample_time": 0.01,
+        "type": "time",
+        "unit": "seconds",
+        "version": "7ca18c4459ccaee8e5696e370f8bd897c1058bf2e7f975238ad8d208c0cc78d2",
+        "warmup_time": -1
+    },
     "factor.TimeDiscreteFactor.time_factor_compare": {
         "code": "class TimeDiscreteFactor:\n    def time_factor_compare(self):\n        self.phi_large == self.phi_large\n\n    def setup(self):\n        self.phi_large = DiscreteFactor(range(10), [2] * 10, [1] * (2**10))",
         "min_run_count": 2,
@@ -277,7 +292,7 @@
         "warmup_time": -1
     },
     "sampling.TimeSampling.time_forward_sample": {
-        "code": "class TimeSampling:\n    def time_forward_sample(self):\n        self.model.simulate(n_samples=int(1e4), show_progress=False)\n\n    def setup(self):\n        self.model = get_example_model('alarm')\n        self.s = BayesianModelSampling(self.model)",
+        "code": "class TimeSampling:\n    def time_forward_sample(self):\n        self.model.simulate(n_samples=int(1e4), show_progress=False)\n\n    def setup(self):\n        self.model = get_example_model('alarm')",
         "min_run_count": 2,
         "name": "sampling.TimeSampling.time_forward_sample",
         "number": 0,
@@ -289,7 +304,7 @@
         "timeout": 600.0,
         "type": "time",
         "unit": "seconds",
-        "version": "35b4d4940e380f94846369d5ba08b91efdeecfee726e8395f3e3fc210524a94e",
+        "version": "f47e31169b97ba85ad498cb217662feda540df8266ffa8bc3a9187058f2baa84",
         "warmup_time": -1
     },
     "structure_learning.TimeHillClimbAlarmModel.time_hillclimb": {
@@ -322,6 +337,22 @@
         "type": "time",
         "unit": "seconds",
         "version": "bccd0e25da5679e44fe8544e41ae2ed7cae86d57c027383171f89f1ab81aeb7d",
+        "warmup_time": -1
+    },
+    "structure_learning.TimePCAlarmModel.time_pc_parallel": {
+        "code": "class TimePCAlarmModel:\n    def time_pc_parallel(self):\n        self.est.estimate(variant='parallel')\n\n    def setup(self):\n        model = get_example_model('alarm')\n        samples = model.simulate(n_samples=int(1e4), seed=42, show_progress=False)\n        self.est = PC(samples)",
+        "min_run_count": 2,
+        "name": "structure_learning.TimePCAlarmModel.time_pc_parallel",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "repeat": 0,
+        "rounds": 2,
+        "sample_time": 0.01,
+        "timeout": 600.0,
+        "type": "time",
+        "unit": "seconds",
+        "version": "8b1c750500b3d4caaced8d20042f4324691d6750070e7756ec30fdfdfddacf5a",
         "warmup_time": -1
     },
     "structure_learning.TimePCAlarmModel.time_pc_stable": {
