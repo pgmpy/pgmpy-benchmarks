@@ -1,4 +1,5 @@
 import numpy as np
+import gc
 
 from pgmpy.factors.discrete import DiscreteFactor
 
@@ -21,3 +22,7 @@ class TimeDiscreteFactor:
 
     def time_copy(self):
         self.phi_large.copy()
+
+    def teardown(self):
+        del self.phi_large
+        gc.collect()

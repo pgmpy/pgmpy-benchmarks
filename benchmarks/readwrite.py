@@ -2,20 +2,24 @@ from pgmpy.readwrite import BIFReader, BIFWriter
 from pgmpy.utils import get_example_model
 
 
-class TimeRead:
+class TimeReadAlarm:
     def setup(self):
-        self.asia = get_example_model('asia')
+        self.alarm = get_example_model('alarm')
+
+    def time_read(self):
+        get_example_model('alarm')
+
+    def time_write(self):
+        BIFWriter(self.alarm).write_bif('\tmp')
+
+
+class TimeReadMunin:
+    def setup(self):
         self.munin = get_example_model('munin')
 
-    def time_asia_read(self):
-        get_example_model('asia')
-
-    def time_munin_read(self):
+    def time_read(self):
         get_example_model('munin')
 
-    def time_asia_write(self):
-        BIFWriter(self.asia).write_bif('\tmp')
-
-    def time_munin_write(self):
+    def time_write(self):
         BIFWriter(self.munin).write_bif('\tmp')
 

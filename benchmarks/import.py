@@ -1,3 +1,5 @@
 class TimeImport:
-    def time_import(self):
+    def timeraw_import(self):
+        return """
         import pgmpy
+        """
