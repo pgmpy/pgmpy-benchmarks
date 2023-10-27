@@ -17,10 +17,10 @@ class TimeMLEAlarm:
         return MaximumLikelihoodEstimator(alarm_model, alarm.simulate(int(1e3)))
 
     def time_mle(self, alarm_est):
-        alarm_est.get_parameters(n_jobs=-1)
+        alarm_est.get_parameters(n_jobs=1)
 
     def peakmem_mle(self, alarm_est):
-        alarm_est.get_parameters(n_jobs=-1)
+        alarm_est.get_parameters(n_jobs=1)
 
     def teardown(self, alarm_est):
         get_reusable_executor().shutdown(wait=True)
@@ -58,10 +58,10 @@ class TimeBayesianEstimatorAlarm:
         return self.alarm_est
 
     def time_bayesian_estimator(self, est):
-        est.get_parameters(n_jobs=-1)
+        est.get_parameters(n_jobs=1)
 
     def peakmem_bayesian_estimator(self, est):
-        est.get_parameters(n_jobs=-1)
+        est.get_parameters(n_jobs=1)
 
     def teardown(self, est):
         get_reusable_executor().shutdown(wait=True)
@@ -100,10 +100,10 @@ class TimeExpectationMaximizationAlarm:
         return self.alarm_est
 
     def time_em(self, est):
-        est.get_parameters(n_jobs=-1)
+        est.get_parameters(n_jobs=1)
 
     def peakmem_em(self, est):
-        est.get_parameters(n_jobs=-1)
+        est.get_parameters(n_jobs=1)
 
     def teardown(self, est):
         get_reusable_executor().shutdown(wait=True)
