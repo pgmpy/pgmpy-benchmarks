@@ -32,7 +32,7 @@ class TimePCAlarm:
 
 
 class TimePCMunin:
-    timeout = 600.0
+    timeout = 3600.0
     rounds = 1
     repeat = 1
     number = 1
