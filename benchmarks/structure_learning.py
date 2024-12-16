@@ -1,7 +1,7 @@
 import gc
 from joblib.externals.loky import get_reusable_executor
 
-from pgmpy.estimators import PC, HillClimbSearch, K2Score, MmhcEstimator, TreeSearch
+from pgmpy.estimators import PC, HillClimbSearch, K2, MmhcEstimator, TreeSearch
 from pgmpy.sampling import BayesianModelSampling
 from pgmpy.utils import get_example_model
 
@@ -62,7 +62,7 @@ class TimeHillClimbAlarm:
     def setup(self):
         model = get_example_model('alarm')
         samples = model.simulate(n_samples=int(1e3), seed=42, show_progress=False)
-        self.scoring_method = K2Score(samples)
+        self.scoring_method = K2(samples)
         self.est = HillClimbSearch(data=samples)
 
     def time_hillclimb(self):
