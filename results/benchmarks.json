@@ -164,7 +164,7 @@
         "warmup_time": -1
     },
     "parameter_learning.TimeBayesianEstimatorAlarm.peakmem_bayesian_estimator": {
-        "code": "class TimeBayesianEstimatorAlarm:\n    def peakmem_bayesian_estimator(self, est):\n        est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = BayesianNetwork(alarm.edges())\n        self.alarm_est = BayesianEstimator(alarm_model, alarm.simulate(int(1e3)))\n        return self.alarm_est",
+        "code": "class TimeBayesianEstimatorAlarm:\n    def peakmem_bayesian_estimator(self, est):\n        est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = DiscreteBayesianNetwork(alarm.edges())\n        self.alarm_est = BayesianEstimator(alarm_model, alarm.simulate(int(1e3)))\n        return self.alarm_est",
         "name": "parameter_learning.TimeBayesianEstimatorAlarm.peakmem_bayesian_estimator",
         "param_names": [],
         "params": [],
@@ -172,10 +172,10 @@
         "timeout": 1200,
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "e7dfa87b078751ec5bc7ae0954850c1acc38b93197292d6ff82013389475eb35"
+        "version": "678b4496382343dca463d9a0fc4b86e9be77529426f27412fff944e8b0439948"
     },
     "parameter_learning.TimeBayesianEstimatorAlarm.time_bayesian_estimator": {
-        "code": "class TimeBayesianEstimatorAlarm:\n    def time_bayesian_estimator(self, est):\n        est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = BayesianNetwork(alarm.edges())\n        self.alarm_est = BayesianEstimator(alarm_model, alarm.simulate(int(1e3)))\n        return self.alarm_est",
+        "code": "class TimeBayesianEstimatorAlarm:\n    def time_bayesian_estimator(self, est):\n        est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = DiscreteBayesianNetwork(alarm.edges())\n        self.alarm_est = BayesianEstimator(alarm_model, alarm.simulate(int(1e3)))\n        return self.alarm_est",
         "min_run_count": 2,
         "name": "parameter_learning.TimeBayesianEstimatorAlarm.time_bayesian_estimator",
         "number": 1,
@@ -188,11 +188,11 @@
         "timeout": 1200,
         "type": "time",
         "unit": "seconds",
-        "version": "793ccdb4199467f142173941a2e681b6957248a871adb095497d04f44f3ea143",
+        "version": "8207e1820db7eeb2e9299866c5ef6fc66a355b31ac84be635592e76c246796e0",
         "warmup_time": -1
     },
     "parameter_learning.TimeBayesianEstimatorMunin.peakmem_bayesian_estimator": {
-        "code": "class TimeBayesianEstimatorMunin:\n    def peakmem_bayesian_estimator(self, est):\n        est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = BayesianNetwork(munin.edges())\n        self.munin_est = BayesianEstimator(munin_model, munin.simulate(int(1e3)))\n        return self.munin_est",
+        "code": "class TimeBayesianEstimatorMunin:\n    def peakmem_bayesian_estimator(self, est):\n        est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = DiscreteBayesianNetwork(munin.edges())\n        self.munin_est = BayesianEstimator(munin_model, munin.simulate(int(1e3)))\n        return self.munin_est",
         "name": "parameter_learning.TimeBayesianEstimatorMunin.peakmem_bayesian_estimator",
         "param_names": [],
         "params": [],
@@ -200,10 +200,10 @@
         "timeout": 1200,
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "e04f81b1b0499099eb077c4cd44be826692268c257d1f6097c5dbab2c71a7e45"
+        "version": "42939f008132aedd323717571e47de69fbbe44fdb8b31a8fbdbc6e5bb8cb56e3"
     },
     "parameter_learning.TimeBayesianEstimatorMunin.time_bayesian_estimator": {
-        "code": "class TimeBayesianEstimatorMunin:\n    def time_bayesian_estimator(self, est):\n        est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = BayesianNetwork(munin.edges())\n        self.munin_est = BayesianEstimator(munin_model, munin.simulate(int(1e3)))\n        return self.munin_est",
+        "code": "class TimeBayesianEstimatorMunin:\n    def time_bayesian_estimator(self, est):\n        est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = DiscreteBayesianNetwork(munin.edges())\n        self.munin_est = BayesianEstimator(munin_model, munin.simulate(int(1e3)))\n        return self.munin_est",
         "min_run_count": 2,
         "name": "parameter_learning.TimeBayesianEstimatorMunin.time_bayesian_estimator",
         "number": 1,
@@ -216,11 +216,11 @@
         "timeout": 1200,
         "type": "time",
         "unit": "seconds",
-        "version": "084ce1ae28e8db6c5b1fb5b67673efedcc199f13cc3aaa98da7675e0c3be0164",
+        "version": "ab5f68644f61bf6dc543173401ff8a9bd55d8729826a547a7023899f2815e2d1",
         "warmup_time": -1
     },
     "parameter_learning.TimeExpectationMaximizationAlarm.peakmem_em": {
-        "code": "class TimeExpectationMaximizationAlarm:\n    def peakmem_em(self, est):\n        est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = BayesianNetwork(alarm.edges())\n        self.alarm_est = ExpectationMaximization(alarm_model, alarm.simulate(int(1e3)))\n        return self.alarm_est",
+        "code": "class TimeExpectationMaximizationAlarm:\n    def peakmem_em(self, est):\n        est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = DiscreteBayesianNetwork(alarm.edges())\n        self.alarm_est = ExpectationMaximization(alarm_model, alarm.simulate(int(1e3)))\n        return self.alarm_est",
         "name": "parameter_learning.TimeExpectationMaximizationAlarm.peakmem_em",
         "param_names": [],
         "params": [],
@@ -228,10 +228,10 @@
         "timeout": 600,
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "09b076d672fe966b4dfd27eef49750e2021d29bd0b11254ce6b51d9dcf473622"
+        "version": "d4536168e28ffdac31cf6ddb5e47f20f29684c09b4c2dcd5e74722cc06660295"
     },
     "parameter_learning.TimeExpectationMaximizationAlarm.time_em": {
-        "code": "class TimeExpectationMaximizationAlarm:\n    def time_em(self, est):\n        est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = BayesianNetwork(alarm.edges())\n        self.alarm_est = ExpectationMaximization(alarm_model, alarm.simulate(int(1e3)))\n        return self.alarm_est",
+        "code": "class TimeExpectationMaximizationAlarm:\n    def time_em(self, est):\n        est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = DiscreteBayesianNetwork(alarm.edges())\n        self.alarm_est = ExpectationMaximization(alarm_model, alarm.simulate(int(1e3)))\n        return self.alarm_est",
         "min_run_count": 2,
         "name": "parameter_learning.TimeExpectationMaximizationAlarm.time_em",
         "number": 1,
@@ -244,11 +244,11 @@
         "timeout": 600,
         "type": "time",
         "unit": "seconds",
-        "version": "87dada5bfc78f7b538adbbe4ffde9eb90e8412f2cb5fa2d5c84a04374eb66d8e",
+        "version": "fe419fddd1fe5b1795f2faa8c918f536e4d428e4ded57f9d81df3e51d31c0319",
         "warmup_time": -1
     },
     "parameter_learning.TimeExpectationMaximizationMunin.peakmem_em": {
-        "code": "class TimeExpectationMaximizationMunin:\n    def peakmem_em(self, est):\n        est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = BayesianNetwork(munin.edges())\n        self.munin_est = ExpectationMaximization(munin_model, munin.simulate(int(1e3)))\n        return self.munin_est",
+        "code": "class TimeExpectationMaximizationMunin:\n    def peakmem_em(self, est):\n        est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = DiscreteBayesianNetwork(munin.edges())\n        self.munin_est = ExpectationMaximization(munin_model, munin.simulate(int(1e3)))\n        return self.munin_est",
         "name": "parameter_learning.TimeExpectationMaximizationMunin.peakmem_em",
         "param_names": [],
         "params": [],
@@ -256,10 +256,10 @@
         "timeout": 600,
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "ddb7ab1998d94fb6e35ba60e6950b601037ad84da3e0187dfb7103f197a2b295"
+        "version": "d0fbd055021a7b2d5e734aaf31359a9ee7d76c7bb77384ab04f058c53b4200ff"
     },
     "parameter_learning.TimeExpectationMaximizationMunin.time_em": {
-        "code": "class TimeExpectationMaximizationMunin:\n    def time_em(self, est):\n        est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = BayesianNetwork(munin.edges())\n        self.munin_est = ExpectationMaximization(munin_model, munin.simulate(int(1e3)))\n        return self.munin_est",
+        "code": "class TimeExpectationMaximizationMunin:\n    def time_em(self, est):\n        est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = DiscreteBayesianNetwork(munin.edges())\n        self.munin_est = ExpectationMaximization(munin_model, munin.simulate(int(1e3)))\n        return self.munin_est",
         "min_run_count": 2,
         "name": "parameter_learning.TimeExpectationMaximizationMunin.time_em",
         "number": 1,
@@ -272,11 +272,11 @@
         "timeout": 600,
         "type": "time",
         "unit": "seconds",
-        "version": "bb5fe4076c21884eff81797a66070b4d8ff0f01d18df5e46948491a0847ed428",
+        "version": "bafe06c470b54e503c59d2c7d88cb5895ff50e55b6e5504dfe0d09e0d443a2c0",
         "warmup_time": -1
     },
     "parameter_learning.TimeMLEAlarm.peakmem_mle": {
-        "code": "class TimeMLEAlarm:\n    def peakmem_mle(self, alarm_est):\n        alarm_est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = BayesianNetwork(alarm.edges())\n        return MaximumLikelihoodEstimator(alarm_model, alarm.simulate(int(1e3)))",
+        "code": "class TimeMLEAlarm:\n    def peakmem_mle(self, alarm_est):\n        alarm_est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = DiscreteBayesianNetwork(alarm.edges())\n        return MaximumLikelihoodEstimator(alarm_model, alarm.simulate(int(1e3)))",
         "name": "parameter_learning.TimeMLEAlarm.peakmem_mle",
         "param_names": [],
         "params": [],
@@ -284,10 +284,10 @@
         "timeout": 600,
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "185bc76da666cfeb41d06ecff54219edbb56ae493d52de9aa03839e69b32236a"
+        "version": "6bb9a52748f80980b26fee8fbe39d82238765f5db49b9c5006211533cb60a784"
     },
     "parameter_learning.TimeMLEAlarm.time_mle": {
-        "code": "class TimeMLEAlarm:\n    def time_mle(self, alarm_est):\n        alarm_est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = BayesianNetwork(alarm.edges())\n        return MaximumLikelihoodEstimator(alarm_model, alarm.simulate(int(1e3)))",
+        "code": "class TimeMLEAlarm:\n    def time_mle(self, alarm_est):\n        alarm_est.get_parameters(n_jobs=1)\n\n    def setup_cache(self):\n        alarm = get_example_model('alarm')\n        alarm_model = DiscreteBayesianNetwork(alarm.edges())\n        return MaximumLikelihoodEstimator(alarm_model, alarm.simulate(int(1e3)))",
         "min_run_count": 2,
         "name": "parameter_learning.TimeMLEAlarm.time_mle",
         "number": 1,
@@ -300,11 +300,11 @@
         "timeout": 600,
         "type": "time",
         "unit": "seconds",
-        "version": "41f567109eb65f6ab2d9b8a8f5deffc52108545c1ff9350a485efa6bec36150d",
+        "version": "a56ad31612b4505c6208154252aadcf9fc3c4d6c810694992eda1b2a5e1d6c04",
         "warmup_time": -1
     },
     "parameter_learning.TimeMLEMunin.peakmem_mle": {
-        "code": "class TimeMLEMunin:\n    def peakmem_mle(self, munin_est):\n        munin_est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = BayesianNetwork(munin.edges())\n        return MaximumLikelihoodEstimator(munin_model, munin.simulate(int(1e3)))",
+        "code": "class TimeMLEMunin:\n    def peakmem_mle(self, munin_est):\n        munin_est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = DiscreteBayesianNetwork(munin.edges())\n        return MaximumLikelihoodEstimator(munin_model, munin.simulate(int(1e3)))",
         "name": "parameter_learning.TimeMLEMunin.peakmem_mle",
         "param_names": [],
         "params": [],
@@ -312,10 +312,10 @@
         "timeout": 600,
         "type": "peakmemory",
         "unit": "bytes",
-        "version": "591e2066c808bfbe0f8bafc6a13b0487ce54f777fc9fdb9cb097a622b808cb19"
+        "version": "7fe0d0ab742f9281a12fcfcc75f92bc282017dd2aca762401e9aaac4f9f618ac"
     },
     "parameter_learning.TimeMLEMunin.time_mle": {
-        "code": "class TimeMLEMunin:\n    def time_mle(self, munin_est):\n        munin_est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = BayesianNetwork(munin.edges())\n        return MaximumLikelihoodEstimator(munin_model, munin.simulate(int(1e3)))",
+        "code": "class TimeMLEMunin:\n    def time_mle(self, munin_est):\n        munin_est.get_parameters(n_jobs=-1)\n\n    def setup_cache(self):\n        munin = get_example_model('munin')\n        munin_model = DiscreteBayesianNetwork(munin.edges())\n        return MaximumLikelihoodEstimator(munin_model, munin.simulate(int(1e3)))",
         "min_run_count": 2,
         "name": "parameter_learning.TimeMLEMunin.time_mle",
         "number": 1,
@@ -328,7 +328,7 @@
         "timeout": 600,
         "type": "time",
         "unit": "seconds",
-        "version": "bbc415c58879f0b3ccf5d60b4f5c763906b94bcc5158d273e7217d35b8b6e325",
+        "version": "59ed0d38c85c9a77e2c33b61b3e08abfef07344333cdb8f0d9abdcece77a8635",
         "warmup_time": -1
     },
     "readwrite.TimeReadAlarm.time_read": {
@@ -424,7 +424,7 @@
         "warmup_time": -1
     },
     "structure_learning.TimeHillClimbAlarm.time_hillclimb": {
-        "code": "class TimeHillClimbAlarm:\n    def time_hillclimb(self):\n        self.est.estimate(max_indegree=4, scoring_method=self.scoring_method, max_iter=int(1e3))\n\n    def setup(self):\n        model = get_example_model('alarm')\n        samples = model.simulate(n_samples=int(1e3), seed=42, show_progress=False)\n        self.scoring_method = K2Score(samples)\n        self.est = HillClimbSearch(data=samples)",
+        "code": "class TimeHillClimbAlarm:\n    def time_hillclimb(self):\n        self.est.estimate(max_indegree=4, scoring_method=self.scoring_method, max_iter=int(1e3))\n\n    def setup(self):\n        model = get_example_model('alarm')\n        samples = model.simulate(n_samples=int(1e3), seed=42, show_progress=False)\n        self.scoring_method = K2(samples)\n        self.est = HillClimbSearch(data=samples)",
         "min_run_count": 2,
         "name": "structure_learning.TimeHillClimbAlarm.time_hillclimb",
         "number": 1,
@@ -436,7 +436,7 @@
         "timeout": 1200.0,
         "type": "time",
         "unit": "seconds",
-        "version": "e9bb677cc8e0b9733d0f7d3b2fea82ec7ed1e46df6efc66c9260d9438a9590aa",
+        "version": "3327d00a7d383e2a7b5697b1a5449cd54996efec02713b5384a05f6f074f283d",
         "warmup_time": -1
     },
     "structure_learning.TimePCAlarm.time_pc_orig": {
