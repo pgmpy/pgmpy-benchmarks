@@ -2,7 +2,7 @@ import gc
 from joblib.externals.loky import get_reusable_executor
 
 from pgmpy.utils import get_example_model
-from pgmpy.models import BayesianNetwork
+from pgmpy.models import DiscreteBayesianNetwork
 from pgmpy.estimators import MaximumLikelihoodEstimator, BayesianEstimator, ExpectationMaximization
 
 
@@ -13,7 +13,7 @@ class TimeMLEAlarm:
 
     def setup_cache(self):
         alarm = get_example_model('alarm')
-        alarm_model = BayesianNetwork(alarm.edges())
+        alarm_model = DiscreteBayesianNetwork(alarm.edges())
         return MaximumLikelihoodEstimator(alarm_model, alarm.simulate(int(1e3)))
 
     def time_mle(self, alarm_est):
@@ -33,7 +33,7 @@ class TimeMLEMunin:
 
     def setup_cache(self):
         munin = get_example_model('munin')
-        munin_model = BayesianNetwork(munin.edges())
+        munin_model = DiscreteBayesianNetwork(munin.edges())
         return MaximumLikelihoodEstimator(munin_model, munin.simulate(int(1e3)))
 
     def time_mle(self, munin_est):
@@ -53,7 +53,7 @@ class TimeBayesianEstimatorAlarm:
 
     def setup_cache(self):
         alarm = get_example_model('alarm')
-        alarm_model = BayesianNetwork(alarm.edges())
+        alarm_model = DiscreteBayesianNetwork(alarm.edges())
         self.alarm_est = BayesianEstimator(alarm_model, alarm.simulate(int(1e3)))
         return self.alarm_est
 
@@ -74,7 +74,7 @@ class TimeBayesianEstimatorMunin:
 
     def setup_cache(self):
         munin = get_example_model('munin')
-        munin_model = BayesianNetwork(munin.edges())
+        munin_model = DiscreteBayesianNetwork(munin.edges())
         self.munin_est = BayesianEstimator(munin_model, munin.simulate(int(1e3)))
         return self.munin_est
 
@@ -95,7 +95,7 @@ class TimeExpectationMaximizationAlarm:
 
     def setup_cache(self):
         alarm = get_example_model('alarm')
-        alarm_model = BayesianNetwork(alarm.edges())
+        alarm_model = DiscreteBayesianNetwork(alarm.edges())
         self.alarm_est = ExpectationMaximization(alarm_model, alarm.simulate(int(1e3)))
         return self.alarm_est
 
@@ -116,7 +116,7 @@ class TimeExpectationMaximizationMunin:
 
     def setup_cache(self):
         munin = get_example_model('munin')
-        munin_model = BayesianNetwork(munin.edges())
+        munin_model = DiscreteBayesianNetwork(munin.edges())
         self.munin_est = ExpectationMaximization(munin_model, munin.simulate(int(1e3)))
         return self.munin_est
 
