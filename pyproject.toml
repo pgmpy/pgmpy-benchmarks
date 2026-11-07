@@ -1,0 +1,2 @@
+[dependency-groups]
+asv = ["asv==0.6.6", "virtualenv==21.15.5"]

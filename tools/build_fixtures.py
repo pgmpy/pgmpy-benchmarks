@@ -368,7 +368,7 @@ def main():
     parser.add_argument(
         "--only-derived",
         action="store_true",
-        help="write only the *_perturbed and indep_* specs (no network; needs dag_20/dag_500 in --out)",
+        help="write only the *_perturbed and indep_* specs (no network; needs dag_20 in --out)",
     )
     parser.add_argument(
         "--only-readwrite",

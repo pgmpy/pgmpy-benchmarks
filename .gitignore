@@ -3,5 +3,5 @@
 results/
 html/
 env/
-pgmpy/
+pgmpy-dev/
 __pycache__/
