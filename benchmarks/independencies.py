@@ -1,7 +1,6 @@
 """Benchmarks for ``pgmpy.independencies``.
 
-Inputs are the frozen assertion list ``indep_small`` (5 assertions over 7 variables), built with ``_fixtures.independencies``
-(``tools/build_fixtures.independencies_spec``: events of 1-2, 1-3 and 0-2 variables, seeded).
+Inputs are ``_fixtures.independencies``: 5 seeded random assertions over 7 variables.
 
 ``closure`` is exponential in the number of variables and assertions (semi-graphoid axioms applied until
 no new assertion appears), and ``entails``, ``is_equivalent`` and ``reduce`` are built on it. The

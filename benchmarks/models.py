@@ -30,12 +30,12 @@ from benchmarks._fixtures import (
     gaussian_data,
     joint_chain,
     junction_tree,
-    load_spec,
     markov_chain,
     markov_chain_matrices,
     markov_chain_sample,
     markov_network,
     sem_inputs,
+    topological,
 )
 from benchmarks._bench import DISCRETE, GAUSSIAN, MODEL, ROWS, Bench
 from benchmarks.factors import PRODUCT_CELLS, product_prefix
@@ -74,7 +74,7 @@ SEM_ERR_CORR = 1
 
 
 def prefix_factors(name, max_cells):
-    """The leading factors (sorted by scope) of a discrete spec whose joint state space is small."""
+    """The leading factors (sorted by scope) of a discrete model whose joint state space is small."""
     return product_prefix(factors(name), max_cells)
 
 
@@ -700,7 +700,7 @@ class TimeMarkovChainProbFromSample(Bench):
 
 
 def class_and_features(name):
-    columns = [n["name"] for n in load_spec(name)["nodes"]]
+    columns = topological(discrete_bn(name))
     return columns[0], columns[1:]
 
 

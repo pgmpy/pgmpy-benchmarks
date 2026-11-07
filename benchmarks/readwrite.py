@@ -1,4 +1,4 @@
-"""Benchmarks for ``pgmpy.readwrite``, on frozen files in ``benchmarks/data/readwrite``.
+"""Benchmarks for ``pgmpy.readwrite``, on text from pgmpy's writers (PomdpX: ``benchmarks/data/rocksample.pomdpx``).
 
 ``Time<Format>Reader.time_read``: construct from ``string=`` and ``read()``; ``Time<Format>ReaderGetters``: the parsing ``get_*`` methods.
 ``Time<Format>Writer``: ``time_str`` and ``time_write`` (into a temp dir). Inherited ``BaseWriter.write`` is timed once, on BIFWriter.

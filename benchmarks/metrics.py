@@ -1,6 +1,6 @@
 """Benchmarks for ``pgmpy.metrics``: ``evaluate`` once per metric class, and ``get_metric`` by name and by default.
 
-Supervised metrics compare ``dag_20`` with the frozen ``dag_20_perturbed``. Unsupervised metrics evaluate the generating DAG of
+Supervised metrics compare ``dag_20`` with ``dag_20_perturbed``. Unsupervised metrics evaluate the generating DAG of
 ``random_gaussian_8`` against its data, with the ``pearsonr`` CI test and ``bic-g``.
 
 Skipped: none

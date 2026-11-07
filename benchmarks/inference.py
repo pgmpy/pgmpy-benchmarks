@@ -19,13 +19,13 @@ from functools import lru_cache
 import networkx as nx
 from benchmarks._fixtures import (
     dbn,
+    dbn_spec,
     discrete_bn,
     discrete_data,
     first_states,
     gaussian_bn,
     gaussian_data,
     junction_tree,
-    load_spec,
     pairwise_markov_network,
     tree_factor_graph,
 )
@@ -282,7 +282,7 @@ class TimeDBNInference(Bench):
         self.name = DBN_MODEL
         self.model = dbn(self.name)
         self.inference = DBNInference(self.model)
-        variables = sorted(load_spec(self.name)["variables"])
+        variables = sorted(dbn_spec(self.name)["variables"])
         query, evidence = variables[:N_QUERY], variables[-N_EVIDENCE:]
         self.query = [(v, 2) for v in query]
         self.backward_query = [(v, 1) for v in query]

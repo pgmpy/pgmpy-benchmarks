@@ -1,17 +1,18 @@
-"""Benchmark inputs rebuilt from the frozen specs in benchmarks/data, with pgmpy constructors and numpy only (no simulate/forward_sample/get_random/readers)."""
+"""Benchmark inputs, built with pgmpy and fixed seeds. Each input is built once per process; every caller gets a copy."""
 
-import gzip
-import json
-from bisect import bisect_left
+import copy
+import random
 from collections import defaultdict
-from functools import lru_cache
+from functools import cache, wraps
 from pathlib import Path
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 
-from pgmpy.base import ADMG, DAG, MAG, PDAG, UndirectedGraph
-from pgmpy.factors.continuous import LinearGaussianCPD
+from benchmarks._bench import DISCRETE, MODEL
+from pgmpy.base import DAG, MAG
+from pgmpy.example_models import load_model
 from pgmpy.factors.discrete import DiscreteFactor, JointProbabilityDistribution, State, TabularCPD
 from pgmpy.independencies import Independencies
 from pgmpy.models import (
@@ -19,101 +20,109 @@ from pgmpy.models import (
     DiscreteMarkovNetwork,
     DynamicBayesianNetwork,
     FactorGraph,
-    JunctionTree,
     LinearGaussianBayesianNetwork,
     MarkovChain,
 )
+from pgmpy.readwrite import BIFWriter, LGBNJSONWriter, NETWriter, PomdpXReader, UAIWriter, XBNWriter, XDSLWriter, XMLBIFWriter
 
 DATA_DIR = Path(__file__).parent / "data"
+EDGE_PROB = 0.15
+LATENT_FRACTION = 0.1
+DBN_SLICES = 3
 
 
-@lru_cache(maxsize=None)
-def load_spec(name):
-    with gzip.open(DATA_DIR / f"{name}.json.gz", "rt") as f:
-        return json.load(f)
+def fresh(build):
+    """Cache ``build`` and give every caller a deep copy (``setup`` re-runs before each timed call; some methods mutate)."""
+    cached = cache(build)
+    return wraps(build)(lambda *args, **kwargs: copy.deepcopy(cached(*args, **kwargs)))
 
 
-@lru_cache(maxsize=None)
-def readwrite_text(fmt, name):
-    with gzip.open(DATA_DIR / "readwrite" / f"{name}.{fmt}.gz", "rt", encoding="utf-8") as f:
-        return f.read()
+def topological(model):
+    return list(nx.topological_sort(model))
 
 
-def pomdpx_model_data(name):
-    return json.loads(readwrite_text("model.json", name))
-
-
-def _edges(spec):
-    return [(p, n["name"]) for n in spec["nodes"] for p in n["parents"]]
-
-
+@fresh
 def discrete_bn(name):
-    spec = load_spec(name)
-    states = {n["name"]: n["states"] for n in spec["nodes"]}
-    model = DiscreteBayesianNetwork(_edges(spec))
-    model.add_nodes_from(states)
-    cpds = []
-    for n in spec["nodes"]:
-        parents = n["parents"]
-        cpds.append(
-            TabularCPD(
-                n["name"],
-                len(n["states"]),
-                n["values"],
-                evidence=parents or None,
-                evidence_card=[len(states[p]) for p in parents] or None,
-                state_names={v: states[v] for v in [n["name"], *parents]},
-            )
-        )
-    model.add_cpds(*cpds)
-    return model
+    return load_model(f"bnlearn/{name}")
 
 
+@fresh
 def gaussian_bn(name):
-    spec = load_spec(name)
-    model = LinearGaussianBayesianNetwork(_edges(spec))
-    model.add_nodes_from(n["name"] for n in spec["nodes"])
-    model.add_cpds(
-        *[
-            LinearGaussianCPD(
-                n["name"], [n["intercept"], *n["coefficients"]], n["std"], evidence=n["parents"]
-            )
-            for n in spec["nodes"]
-        ]
-    )
-    return model
+    """``random_gaussian_<n>``."""
+    return LinearGaussianBayesianNetwork.get_random(n_nodes=int(name.rsplit("_", 1)[1]), edge_prob=0.3, rng=0)
 
 
+@fresh
 def graph(name):
-    spec = load_spec(name)
-    kind = spec["kind"]
-    directed = [tuple(e) for e in spec["directed"]]
-    undirected = [tuple(e) for e in spec["undirected"]]
-    bidirected = [tuple(e) for e in spec["bidirected"]]
-    if kind == "dag":
-        g = DAG(directed)
-        g.add_nodes_from(spec["nodes"])
-    elif kind == "ug":
-        g = UndirectedGraph(undirected)
-        g.add_nodes_from(spec["nodes"])
-    else:
-        cls = {"pdag": PDAG, "admg": ADMG, "mag": MAG}[kind]
-        g = cls(
-            edge_list=[(u, v, "->") for u, v in directed]
-            + [(u, v, "--") for u, v in undirected]
-            + [(u, v, "<>") for u, v in bidirected]
-        )
-        g.add_nodes_from(spec["nodes"])
-    return g
+    """``<kind>_<n>`` (kind: dag, pdag, ug, admg or mag) or ``dag_<n>_perturbed``."""
+    kind, n, *perturbed = name.split("_")
+    n = int(n)
+    if kind in ("admg", "mag"):
+        admg = _admg(n)
+        return admg if kind == "admg" else _mag(admg)
+    dag = DAG.get_random(n_nodes=n, edge_prob=EDGE_PROB, rng=0)
+    if kind == "pdag":
+        return dag.to_pdag()
+    if kind == "ug":
+        return dag.moralize()
+    return _perturbed(dag) if perturbed else dag
 
 
+def _admg(n):
+    """A random DAG over ``n`` nodes plus 10% more, with those extra nodes latent and projected out."""
+    n_latent = max(1, round(n * LATENT_FRACTION))
+    dag = DAG.get_random(n_nodes=n + n_latent, edge_prob=EDGE_PROB, rng=0)
+    dag.latents = set(np.random.default_rng(0).choice(list(dag.nodes()), size=n_latent, replace=False).tolist())
+    return dag.to_admg()
+
+
+def _mag(admg):
+    """``admg`` without the bidirected edges between a node and its ancestor."""
+    ancestors = {v: admg.get_ancestors(v) for v in admg.nodes()}
+    edges = [
+        (u, v, t)
+        for u, v, t in admg.get_edges(data=True)
+        if t == "->" or (u not in ancestors[v] and v not in ancestors[u])
+    ]
+    mag = MAG(edge_list=edges)
+    mag.add_nodes_from(admg.nodes())
+    return mag
+
+
+def _perturbed(dag, fraction=0.1, rng=0):
+    """``dag`` with ``fraction`` of its sorted edges reversed (unless that closes a cycle) and as many others removed."""
+    edges = sorted(dag.edges())
+    n = round(fraction * len(edges))
+    picked = np.random.default_rng(rng).permutation(len(edges))[: 2 * n]
+    removed = {edges[i] for i in picked[n:]}
+    out = DAG([e for e in edges if e not in removed])
+    out.add_nodes_from(dag.nodes())
+    for u, v in sorted(edges[i] for i in picked[:n]):
+        out.remove_edge(u, v)
+        out.add_edge(*((u, v) if nx.has_path(out, u, v) else (v, u)))
+    return out
+
+
+@fresh
 def independencies(name):
-    return Independencies(*load_spec(name)["assertions"])
+    """``indep_small``: 5 distinct assertions [X, Y, Z] over V0..V6, with 1-2, 1-3 and 0-2 variables."""
+    rng = np.random.default_rng(0)
+    names = [f"V{i}" for i in range(7)]
+    assertions = []
+    while len(assertions) < 5:
+        a, b, c = int(rng.integers(1, 3)), int(rng.integers(1, 4)), int(rng.integers(0, 3))
+        pick = [str(v) for v in rng.choice(names, size=a + b + c, replace=False)]
+        assertion = [sorted(pick[:a]), sorted(pick[a : a + b]), sorted(pick[a + b :])]
+        if assertion not in assertions:
+            assertions.append(assertion)
+    return Independencies(*assertions)
 
 
+@cache
 def syntax(name):
-    spec = load_spec(name)
-    return spec["lavaan"], spec["dagitty"]
+    """``syntax_<n>``: ``dag_<n>`` as lavaan and dagitty text."""
+    dag = graph(name.replace("syntax", "dag"))
+    return dag.to_lavaan(), dag.to_dagitty()
 
 
 def bare(model):
@@ -127,36 +136,22 @@ def first_states(model, nodes):
     return {n: model.states[n][0] for n in nodes}
 
 
-def _factors(spec):
-    states = {n["name"]: n["states"] for n in spec["nodes"]}
-    return [_reduced_factor(n, states, n["parents"]) for n in spec["nodes"]]
-
-
-def _moral_edges(spec):
-    edges = set()
-    for n in spec["nodes"]:
-        parents = n["parents"]
-        edges.update((p, n["name"]) for p in parents)
-        edges.update((a, b) for i, a in enumerate(parents) for b in parents[i + 1 :])
-    return sorted(edges)
+def _cpds(name):
+    model = discrete_bn(name)
+    return [model.get_cpds(v) for v in topological(model)]
 
 
 def factors(name):
-    """One DiscreteFactor per CPD family of a discrete spec, in spec order."""
-    return _factors(load_spec(name))
+    """One DiscreteFactor per CPD family, in topological order."""
+    return [cpd.to_factor() for cpd in _cpds(name)]
 
 
 def markov_network(name):
-    spec = load_spec(name)
-    model = DiscreteMarkovNetwork(_moral_edges(spec))
-    model.add_nodes_from(n["name"] for n in spec["nodes"])
-    model.add_factors(*_factors(spec))
-    return model
+    return discrete_bn(name).to_markov_model()
 
 
 def factor_graph(name):
-    spec = load_spec(name)
-    return _factor_graph([n["name"] for n in spec["nodes"]], _factors(spec))
+    return _factor_graph(topological(discrete_bn(name)), factors(name))
 
 
 def _factor_graph(variables, fs):
@@ -168,16 +163,15 @@ def _factor_graph(variables, fs):
     return fg
 
 
-def _reduced_factor(node, states, kept):
-    """Factor over ``[node, *kept]`` from a spec node's CPD, averaged over the parents not in ``kept``."""
-    parents = node["parents"]
-    cards = [len(states[v]) for v in (node["name"], *parents)]
-    table = np.asarray(node["values"], dtype=float).reshape(cards)
+def _reduced_factor(cpd, kept):
+    """Factor over ``[cpd.variable, *kept]`` from ``cpd``, averaged over the parents not in ``kept``."""
+    parents = cpd.variables[1:]
+    table = cpd.values
     dropped = tuple(1 + i for i, p in enumerate(parents) if p not in kept)
     if dropped:
         table = table.mean(axis=dropped)
-    scope = [node["name"], *(p for p in parents if p in kept)]
-    return DiscreteFactor(scope, list(table.shape), table.ravel(), state_names={v: states[v] for v in scope})
+    scope = [cpd.variable, *(p for p in parents if p in kept)]
+    return DiscreteFactor(scope, list(table.shape), table.ravel(), state_names={v: cpd.state_names[v] for v in scope})
 
 
 def bfs_prefix(edges, start, n_nodes):
@@ -201,24 +195,23 @@ def bfs_prefix(edges, start, n_nodes):
 
 def pairwise_markov_network(name):
     """Pairwise network for ``Mplp``: a factor per node (CPD averaged over parents) and per BN edge (child CPD averaged over other parents)."""
-    spec = load_spec(name)
-    states = {n["name"]: n["states"] for n in spec["nodes"]}
+    cpds = _cpds(name)
     edges, fs = [], []
-    for node in spec["nodes"]:
-        fs.append(_reduced_factor(node, states, ()))
-        for p in node["parents"]:
-            fs.append(_reduced_factor(node, states, (p,)))
-            edges.append((p, node["name"]))
+    for cpd in cpds:
+        fs.append(_reduced_factor(cpd, ()))
+        for p in cpd.variables[1:]:
+            fs.append(_reduced_factor(cpd, (p,)))
+            edges.append((p, cpd.variable))
     model = DiscreteMarkovNetwork(edges)
-    model.add_nodes_from(states)
+    model.add_nodes_from(cpd.variable for cpd in cpds)
     model.add_factors(*fs)
     return model
 
 
-@lru_cache(maxsize=None)
+@cache
 def _tree_kept_parents(name):
-    spec = load_spec(name)
-    root = {n["name"]: n["name"] for n in spec["nodes"]}
+    model = discrete_bn(name)
+    root = {v: v for v in model.nodes()}
 
     def find(v):
         while root[v] != v:
@@ -227,38 +220,26 @@ def _tree_kept_parents(name):
         return v
 
     kept = {}
-    for node in sorted(spec["nodes"], key=lambda n: n["name"]):
-        kept[node["name"]] = set()
-        for p in sorted(node["parents"]):
-            a, b = find(p), find(node["name"])
+    for node in sorted(model.nodes()):
+        kept[node] = set()
+        for p in sorted(model.get_parents(node)):
+            a, b = find(p), find(node)
             if a != b:
                 root[a] = b
-                kept[node["name"]].add(p)
+                kept[node].add(p)
     return kept
 
 
 def tree_factor_graph(name):
     """Forest-shaped factor graph for ``BeliefPropagationWithMessagePassing``: each node keeps the parents that close no cycle (sorted order); dropped parents are averaged out."""
-    spec = load_spec(name)
-    states = {n["name"]: n["states"] for n in spec["nodes"]}
     kept = _tree_kept_parents(name)
-    fs = [_reduced_factor(n, states, kept[n["name"]]) for n in spec["nodes"]]
-    return _factor_graph(states, fs)
+    cpds = _cpds(name)
+    return _factor_graph([cpd.variable for cpd in cpds], [_reduced_factor(cpd, kept[cpd.variable]) for cpd in cpds])
 
 
 def junction_tree(name):
-    spec = load_spec(name)
-    cliques = [tuple(c) for c in spec["cliques"]]
-    jt = JunctionTree()
-    jt.add_nodes_from(cliques)
-    jt.add_edges_from([(cliques[i], cliques[j]) for i, j in spec["edges"]])
-    jt.add_factors(
-        *[
-            DiscreteFactor(f["scope"], f["cardinality"], f["values"], state_names=f["state_names"])
-            for f in spec["factors"]
-        ]
-    )
-    return jt
+    """``jt_<model>``: the junction tree of a bnlearn model."""
+    return discrete_bn(name.removeprefix("jt_")).to_junction_tree()
 
 
 def random_factor(n_vars, card, seed=0):
@@ -287,53 +268,16 @@ def joint_chain(n_vars, seed=0):
     return JointProbabilityDistribution(names, [2] * n_vars, joint.ravel()), model
 
 
-def _draw(probs, rng):
-    code = (np.cumsum(probs, axis=1) < rng.random(len(probs))[:, None]).sum(axis=1)
-    return np.minimum(code, probs.shape[1] - 1)  # guards cumsum round-off
-
-
-@lru_cache(maxsize=None)
-def _discrete_array(name, n_rows, seed):
-    spec = load_spec(name)
-    rng = np.random.default_rng(seed)
-    n_states = {n["name"]: len(n["states"]) for n in spec["nodes"]}
-    codes = {}
-    out = np.empty((n_rows, len(spec["nodes"])), dtype=object)
-    for col, n in enumerate(spec["nodes"]):
-        values = np.asarray(n["values"])
-        if n["parents"]:
-            cards = tuple(n_states[p] for p in n["parents"])
-            idx = np.ravel_multi_index(tuple(codes[p] for p in n["parents"]), cards)
-        else:
-            idx = np.zeros(n_rows, dtype=np.intp)
-        probs = values[:, idx].T
-        state_idx = _draw(probs, rng)
-        codes[n["name"]] = state_idx
-        out[:, col] = np.array(n["states"], dtype=object)[state_idx]
-    return out
-
-
+@fresh
 def discrete_data(name, n_rows, seed=0):
-    columns = [n["name"] for n in load_spec(name)["nodes"]]
-    return pd.DataFrame(_discrete_array(name, n_rows, seed).copy(), columns=columns)
+    model = discrete_bn(name)
+    return model.simulate(n_rows, rng=seed, show_progress=False)[topological(model)]
 
 
-@lru_cache(maxsize=None)
-def _gaussian_array(name, n_rows, seed):
-    spec = load_spec(name)
-    rng = np.random.default_rng(seed)
-    cols = {}
-    for n in spec["nodes"]:
-        x = n["intercept"] + rng.normal(0, n["std"], n_rows)
-        if n["parents"]:
-            x = x + np.column_stack([cols[p] for p in n["parents"]]) @ np.asarray(n["coefficients"])
-        cols[n["name"]] = x
-    return np.column_stack([cols[n["name"]] for n in spec["nodes"]])
-
-
+@fresh
 def gaussian_data(name, n_rows, seed=0):
-    columns = [n["name"] for n in load_spec(name)["nodes"]]
-    return pd.DataFrame(_gaussian_array(name, n_rows, seed).copy(), columns=columns)
+    model = gaussian_bn(name)
+    return model.simulate(n_rows, rng=seed)[topological(model)]
 
 
 def mixed_data(name, n_rows, seed=0):
@@ -343,14 +287,13 @@ def mixed_data(name, n_rows, seed=0):
     return df
 
 
-@lru_cache(maxsize=None)
+@cache
 def _sem_inputs(name, n_err_corr):
-    """SEM inputs on a gaussian spec's edges (graph, lavaan, LISREL and RAM forms). Nodes with children are latent, leaves observed; edges are pruned so ``to_standard_lisrel`` works; the first ``2 * n_err_corr`` observed nodes get correlated errors."""
-    spec = load_spec(name)
-    roots = {nd["name"] for nd in spec["nodes"] if not nd["parents"]}
-    coefficient = {
-        (p, nd["name"]): c for nd in spec["nodes"] for p, c in zip(nd["parents"], nd["coefficients"])
-    }
+    """SEM inputs on a gaussian model's edges (graph, lavaan, LISREL and RAM forms). Nodes with children are latent, leaves observed; edges are pruned so ``to_standard_lisrel`` works; the first ``2 * n_err_corr`` observed nodes get correlated errors."""
+    model = gaussian_bn(name)
+    cpds = [model.get_cpds(v) for v in topological(model)]
+    roots = {cpd.variable for cpd in cpds if not cpd.evidence}
+    coefficient = {(p, cpd.variable): float(c) for cpd in cpds for p, c in zip(cpd.evidence, cpd.beta[1:])}
     changed = True
     while changed:  # dropping edges can turn a node into a leaf, so repeat until stable
         changed = False
@@ -364,8 +307,8 @@ def _sem_inputs(name, n_err_corr):
                 changed = True
     ebunch = list(coefficient)
     used = {v for e in ebunch for v in e}
-    std = {nd["name"]: nd["std"] for nd in spec["nodes"]}
-    variables = [nd["name"] for nd in spec["nodes"] if nd["name"] in used]
+    std = {cpd.variable: float(cpd.std) for cpd in cpds}
+    variables = [cpd.variable for cpd in cpds if cpd.variable in used]
     index = {v: i for i, v in enumerate(variables)}
     latents = [v for v in variables if v in {p for p, _ in ebunch}]
     observed = [v for v in variables if v not in latents]
@@ -431,56 +374,54 @@ def _sem_inputs(name, n_err_corr):
 
 
 def sem_inputs(name, n_err_corr):
-    """Structural equation model inputs of a gaussian spec (see ``_sem_inputs``); fresh copies on every call."""
+    """Structural equation model inputs of a gaussian model (see ``_sem_inputs``); fresh copies on every call."""
     return {k: v.copy() if isinstance(v, (np.ndarray, list)) else v for k, v in _sem_inputs(name, n_err_corr).items()}
 
 
+@cache
+def dbn_spec(name, intra_prob=0.4, inter_prob=0.3, interface_every=2, n_states=2):
+    """``dbn_<n>``: a 2-TBN over ``V0..`` with numpy CPDs (``DynamicBayesianNetwork.get_random`` breaks ``DBNInference``).
+
+    * Every ``V(j-1) -> Vj`` intra-slice edge is present (a junction tree needs a connected slice), plus ``Vi -> Vj``
+      (i < j) with ``intra_prob``.
+    * Only every ``interface_every``-th variable has inter-slice edges: ``Vi(0) -> Vi(1)`` always and ``Vi(0) -> Vk(1)``
+      between interface variables with ``inter_prob``, so their sources and targets match (``backward_inference``)
+      and the interface clique stays small.
+    * The other variables have the same parents in both slices (``initialize_initial_state``).
+    """
+    n_vars = int(name.rsplit("_", 1)[1])
+    rng = np.random.default_rng(0)
+    names = [f"V{i}" for i in range(n_vars)]
+    intra = {j: [i for i in range(j) if rng.random() < intra_prob or i == j - 1] for j in range(n_vars)}
+    interface = range(0, n_vars, interface_every)
+    inter = {j: [i for i in interface if i == j or rng.random() < inter_prob] if j in interface else [] for j in range(n_vars)}
+    nodes = []
+    for t in (0, 1):
+        for j in range(n_vars):
+            parents = [(names[i], t) for i in intra[j]] + ([(names[i], 0) for i in inter[j]] if t else [])
+            values = rng.dirichlet(np.ones(n_states), size=n_states ** len(parents)).T
+            nodes.append({"name": (names[j], t), "parents": parents, "values": values})
+    return {"n_states": n_states, "variables": names, "nodes": nodes}
+
+
 def dbn(name):
-    spec = load_spec(name)
+    spec = dbn_spec(name)
     k = spec["n_states"]
     model = DynamicBayesianNetwork()
     model.add_nodes_from(spec["variables"])
-    model.add_edges_from([(tuple(p), (n["name"], n["t"])) for n in spec["nodes"] for p in n["parents"]])
+    model.add_edges_from([(p, n["name"]) for n in spec["nodes"] for p in n["parents"]])
     model.add_cpds(
         *[
-            TabularCPD(
-                (n["name"], n["t"]),
-                k,
-                n["values"],
-                evidence=[tuple(p) for p in n["parents"]] or None,
-                evidence_card=[k] * len(n["parents"]) or None,
-            )
+            TabularCPD(n["name"], k, n["values"], evidence=n["parents"] or None, evidence_card=[k] * len(n["parents"]) or None)
             for n in spec["nodes"]
         ]
     )
     return model
 
 
-DBN_SLICES = 3
-
-
-@lru_cache(maxsize=None)
-def _dbn_array(name, n_rows, seed):
-    spec = load_spec(name)
-    rng = np.random.default_rng(seed)
-    k = spec["n_states"]
-    states = {}  # (variable, slice) -> state codes
-    for t in range(DBN_SLICES):
-        for node in spec["nodes"]:
-            if node["t"] != min(t, 1):
-                continue
-            parents = [(p, t - 1 + pt) if t > 0 else (p, pt) for p, pt in node["parents"]]
-            values = np.asarray(node["values"])
-            idx = np.ravel_multi_index(tuple(states[q] for q in parents), (k,) * len(parents)) if parents else 0
-            probs = values[:, idx].T if parents else np.broadcast_to(values[:, 0], (n_rows, k))
-            states[(node["name"], t)] = _draw(probs, rng)
-    return np.column_stack([states[(v, t)] for t in range(DBN_SLICES) for v in spec["variables"]])
-
-
+@fresh
 def dbn_data(name, n_rows, seed=0):
-    spec = load_spec(name)
-    columns = [(v, t) for t in range(DBN_SLICES) for v in spec["variables"]]
-    return pd.DataFrame(_dbn_array(name, n_rows, seed).copy(), columns=columns)
+    return dbn(name).simulate(n_rows, n_time_slices=DBN_SLICES, rng=seed, show_progress=False)
 
 
 def markov_chain_matrices(n_vars, n_states, seed=0):
@@ -496,21 +437,38 @@ def markov_chain(n_vars, n_states, seed=0):
     return chain
 
 
-@lru_cache(maxsize=None)
-def _markov_chain_array(n_vars, n_states, n_rows, seed):
-    matrices = markov_chain_matrices(n_vars, n_states, seed)
-    rng = np.random.default_rng(seed + 1)
-    out = np.zeros((n_rows, n_vars), dtype=np.int64)  # every variable starts in state 0
-    for col, matrix in enumerate(matrices.values()):
-        cumulative = np.cumsum(matrix, axis=1).tolist()
-        uniform = rng.random(n_rows).tolist()
-        state = 0
-        for row in range(1, n_rows):
-            state = min(bisect_left(cumulative[state], uniform[row]), n_states - 1)
-            out[row, col] = state
-    return out
-
-
+@fresh
 def markov_chain_sample(n_vars, n_states, n_rows, seed=0):
-    columns = list(markov_chain_matrices(n_vars, n_states, seed))
-    return pd.DataFrame(_markov_chain_array(n_vars, n_states, n_rows, seed).copy(), columns=columns)
+    return markov_chain(n_vars, n_states, seed).sample(size=n_rows, rng=seed + 1)
+
+
+@cache
+def readwrite_text(fmt, name):
+    """A reader's input: ``name`` written by pgmpy's writer for ``fmt``. The PomdpX document is a file in ``DATA_DIR``."""
+    if fmt == "pomdpx":
+        return (DATA_DIR / f"{name}.pomdpx").read_text(encoding="utf-8")
+    if fmt == "json":
+        return str(LGBNJSONWriter(gaussian_bn(name)))
+    writers = {"bif": BIFWriter, "xmlbif": XMLBIFWriter, "xbn": XBNWriter, "xdsl": XDSLWriter, "net": NETWriter}
+    writers["uai"] = lambda model: UAIWriter(model, round_values=4)  # UAIReader cannot parse "1e-05"
+    random.seed(0)  # XDSLWriter draws node positions from the global random module
+    return str(writers[fmt](discrete_bn(name)))
+
+
+@fresh
+def pomdpx_model_data(name):
+    reader = PomdpXReader(string=readwrite_text("pomdpx", name))
+    return {
+        "description": reader.get_description(),
+        "discount": str(reader.get_discount()),
+        "variables": reader.get_variables(),
+        "initial_state_belief": reader.get_initial_beliefs(),
+        "state_transition_function": reader.get_state_transition_function(),
+        "obs_function": reader.get_obs_function(),
+        "reward_function": reader.get_reward_function(),
+    }
+
+
+# Parsed at import: asv's forkserver imports the benchmarks once and forks every benchmark process from it.
+for _name in (DISCRETE, MODEL):
+    discrete_bn(_name)

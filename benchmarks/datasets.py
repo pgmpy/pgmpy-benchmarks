@@ -1,7 +1,6 @@
 """Benchmarks for the loaders in ``pgmpy.example_models`` and ``pgmpy.datasets``.
 
-Loaders run offline: ``setup`` warms the Hugging Face cache once, then sets ``HF_HUB_OFFLINE``; ``teardown`` restores it
-(pinned by ``test_loader_timed_call_is_offline``).
+Loaders run offline: ``setup`` warms the Hugging Face cache once, then sets ``HF_HUB_OFFLINE``; ``teardown`` restores it.
 
 Skipped:
     load_interventions, load_expert_knowledge, load_ground_truth: not exported (run by ``load_dataset``)

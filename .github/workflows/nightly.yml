@@ -42,7 +42,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
-          key: hf-pgmpy-benchmarks-${{ hashFiles('benchmarks/datasets.py') }}
+          key: hf-pgmpy-benchmarks-${{ hashFiles('benchmarks/datasets.py', 'benchmarks/_fixtures.py') }}
           restore-keys: hf-pgmpy-benchmarks-
 
       - name: Install benchmark tooling

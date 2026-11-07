@@ -146,29 +146,15 @@ Do not add benchmarks for these items:
 
 ## Fixtures
 
-The benchmark inputs are in the files `benchmarks/data/*.json.gz`. `benchmarks/_fixtures.py` makes the inputs from
-these files. It uses only pgmpy constructors and numpy.
+`benchmarks/_fixtures.py` makes the benchmark inputs with pgmpy and fixed seeds:
 
-Do not use pgmpy to make an input during a benchmark. For example, do not use `simulate`, `forward_sample`,
-`get_random`, readers, writers or conversions. The two commits that asv compares must use the same inputs.
+- `load_model` gives the bnlearn models (`asia`, `alarm`). It reads them through the Hugging Face cache.
+- `get_random(..., rng=0)` gives the random graphs and networks.
+- `simulate(..., rng=0)` gives the data.
+- pgmpy's writers give the reader inputs. The PomdpX document is the only file, `benchmarks/data/rocksample.pomdpx`.
 
-To change a fixture, do these steps:
-
-1. Install pgmpy `dev`. The script uses it:
-
-   ```bash
-   pip install git+https://github.com/pgmpy/pgmpy.git@dev
-   ```
-2. Edit `tools/build_fixtures.py`. Add a spec function, and add it to `build_specs`.
-3. Make the fixture files again:
-
-   ```bash
-   python tools/build_fixtures.py --out benchmarks/data
-   ```
-
-   This command must have network access for `load_model`. It also uses a pgmpy checkout (`--pgmpy`, default
-   `../pgmpy`). To make only some of the files, add `--only-dbn`, `--only-derived` or `--only-readwrite`.
-4. Commit the new fixture files.
+Each input is made one time in each benchmark process, and each caller gets a copy. If a pgmpy change alters one of
+these functions, the inputs of the two commits that asv compares can be different.
 
 ## Nightly workflow
 
