@@ -7,7 +7,6 @@ from benchmarks import _fixtures
 from benchmarks._fixtures import (
     DBN_SLICES,
     bfs_prefix,
-    bfs_subgraph,
     dbn,
     dbn_data,
     discrete_bn,
@@ -40,7 +39,7 @@ def test_discrete_data_does_not_use_pgmpy_sampling(monkeypatch):
 
     monkeypatch.setattr(DiscreteBayesianNetwork, "simulate", boom)
     monkeypatch.setattr(BayesianModelSampling, "forward_sample", boom)
-    _fixtures._discrete_array.cache_clear()  # name of the memoized inner fn
+    _fixtures._discrete_array.cache_clear()
     assert discrete_data("asia", 100, seed=1).shape == (100, 8)
 
 
@@ -63,11 +62,11 @@ def test_gaussian_sampler_recovers_parameters():
 
 
 def test_models_are_valid_and_sized():
-    assert discrete_bn("alarm").check_model()
-    assert (len(discrete_bn("alarm").nodes()), len(discrete_bn("alarm").edges())) == (37, 46)
-    assert len(discrete_bn("munin").nodes()) == 1041
-    assert gaussian_bn("arth150").check_model()
-    assert len(graph("dag_500").nodes()) == 500
+    alarm = discrete_bn("alarm")
+    assert alarm.check_model()
+    assert (len(alarm.nodes()), len(alarm.edges())) == (37, 46)
+    assert gaussian_bn("random_gaussian_8").check_model()
+    assert len(graph("dag_20").nodes()) == 20
 
 
 def test_builders_return_fresh_objects():
@@ -78,10 +77,9 @@ def test_builders_return_fresh_objects():
 
 
 def test_syntax_fixtures_describe_the_dag_fixtures():
-    for n in (20, 500):
-        lavaan, dagitty = syntax(f"syntax_{n}")
-        assert dagitty.count("->") == graph(f"dag_{n}").number_of_edges()
-        assert "~" in lavaan
+    lavaan, dagitty = syntax("syntax_20")
+    assert dagitty.count("->") == graph("dag_20").number_of_edges()
+    assert "~" in lavaan
 
 
 def test_joint_chain_is_a_valid_deterministic_imap():
@@ -99,12 +97,11 @@ def test_factors_match_the_cpd_families():
 
 
 def test_dbn_is_valid_and_sized():
-    for name, n_vars in (("dbn_5", 5), ("dbn_20", 20), ("dbn_50", 50)):
-        model = dbn(name)
-        assert model.check_model()
-        assert len(model.cpds) == 2 * n_vars
-        assert len(model.get_slice_nodes()) == n_vars
-    assert dbn("dbn_5") is not dbn("dbn_5")
+    model = dbn("dbn_5")
+    assert model.check_model()
+    assert len(model.cpds) == 10
+    assert len(model.get_slice_nodes()) == 5
+    assert model is not dbn("dbn_5")
 
 
 def test_dbn_data_is_deterministic_and_unrolled():
@@ -153,33 +150,30 @@ def test_markov_chain_sample_follows_the_transition_matrices():
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")  # pyparsing, used by the lavaan parser
 def test_sem_inputs_agree_with_pgmpy_conversions():
-    for name, n_err_corr in (("random_gaussian_8", 1), ("arth150", 10)):
-        sem = sem_inputs(name, n_err_corr)
-        graph_model = SEMGraph(ebunch=sem["ebunch"], latents=sem["latents"], err_corr=sem["err_corr"])
-        var_names, params, _ = graph_model.to_standard_lisrel()
-        assert {k: set(v) for k, v in var_names.items()} == {k: set(v) for k, v in sem["var_names"].items()}
-        for key in ("B", "gamma", "wedge_y", "wedge_x"):
-            assert params[key].sum() == sem["params"][key].sum()
-        plain = {("v" + u.replace("_", ""), "v" + v.replace("_", "")) for u, v in sem["ebunch"]}
-        assert set(SEM.from_lavaan(string=sem["lavaan"]).graph.edges) == plain
-        alg = SEMAlg(eta=sem["variables"], B=sem["B"], zeta=sem["zeta"], wedge_y=sem["wedge_y"])
-        assert set(alg.to_SEMGraph().graph.edges) == set(sem["ebunch"])
-        alg.set_params(sem["B_values"], sem["zeta_values"])
-        assert alg.generate_samples(n_samples=5).shape == (5, len(sem["observed"]))
-        assert sem["ebunch"] is not sem_inputs(name, n_err_corr)["ebunch"]
+    name, n_err_corr = "random_gaussian_8", 1
+    sem = sem_inputs(name, n_err_corr)
+    graph_model = SEMGraph(ebunch=sem["ebunch"], latents=sem["latents"], err_corr=sem["err_corr"])
+    var_names, params, _ = graph_model.to_standard_lisrel()
+    assert {k: set(v) for k, v in var_names.items()} == {k: set(v) for k, v in sem["var_names"].items()}
+    for key in ("B", "gamma", "wedge_y", "wedge_x"):
+        assert params[key].sum() == sem["params"][key].sum()
+    plain = {("v" + u.replace("_", ""), "v" + v.replace("_", "")) for u, v in sem["ebunch"]}
+    assert set(SEM.from_lavaan(string=sem["lavaan"]).graph.edges) == plain
+    alg = SEMAlg(eta=sem["variables"], B=sem["B"], zeta=sem["zeta"], wedge_y=sem["wedge_y"])
+    assert set(alg.to_SEMGraph().graph.edges) == set(sem["ebunch"])
+    alg.set_params(sem["B_values"], sem["zeta_values"])
+    assert alg.generate_samples(n_samples=5).shape == (5, len(sem["observed"]))
+    assert sem["ebunch"] is not sem_inputs(name, n_err_corr)["ebunch"]
 
 
 def test_dbn_fixtures_are_usable_by_dbn_inference():
-    # DBNInference joins the interface nodes into one clique and multiplies a whole slice into one table.
-    # dbn_50 therefore only has to be constructible; dbn_5 and dbn_20 must also answer queries (backward inference needs the same interface in both slices).
-    assert DBNInference(dbn("dbn_50")).in_clique
-    for name in ("dbn_5", "dbn_20"):
-        inference = DBNInference(dbn(name))
-        variables = [("V0", 2), ("V3", 2)]
-        for result in (inference.forward_inference(variables), inference.query(variables)):
-            for var in variables:
-                np.testing.assert_allclose(result[var].values.sum(), 1)
-        assert inference.backward_inference([("V0", 1), ("V3", 1)])
+    # dbn_5 must answer queries (backward inference needs the same interface in both slices).
+    inference = DBNInference(dbn("dbn_5"))
+    variables = [("V0", 2), ("V3", 2)]
+    for result in (inference.forward_inference(variables), inference.query(variables)):
+        for var in variables:
+            np.testing.assert_allclose(result[var].values.sum(), 1)
+    assert inference.backward_inference([("V0", 1), ("V3", 1)])
 
 
 @pytest.mark.filterwarnings("ignore:At least one state name was not found")  # Mplp's own decoding
@@ -205,15 +199,6 @@ def test_tree_factor_graph_is_a_forest_and_answers_queries_exactly():
     assert tree_factor_graph("asia") is not fg
 
 
-def test_bfs_subgraph_is_deterministic_connected_and_sized():
-    sub = bfs_subgraph("alarm", ["ARTCO2", "CATECHOL"], 16)
-    assert len(sub) == 16
-    assert {"ARTCO2", "CATECHOL"} <= set(sub.nodes)
-    assert nx.is_weakly_connected(sub)
-    assert set(sub.edges()) == set(bfs_subgraph("alarm", ["ARTCO2", "CATECHOL"], 16).edges())
-    assert set(sub.edges()) == {e for e in discrete_bn("alarm").edges() if set(e) <= set(sub.nodes)}
-
-
 def test_bfs_prefix_of_a_graph_fixture_is_deterministic_sized_and_induced():
     dag = graph("dag_20")
     sub = bfs_prefix(dag.edges(), ["X_10", "X_8"], 12)
@@ -223,18 +208,17 @@ def test_bfs_prefix_of_a_graph_fixture_is_deterministic_sized_and_induced():
     assert set(sub.edges()) == {e for e in dag.edges() if set(e) <= set(sub.nodes)}
 
 
-@pytest.mark.parametrize("n", [20, 500])
-def test_perturbed_dag_is_a_valid_acyclic_perturbation_of_the_true_dag(n):
-    true, est = graph(f"dag_{n}"), graph(f"dag_{n}_perturbed")
+def test_perturbed_dag_is_a_valid_acyclic_perturbation_of_the_true_dag():
+    true, est = graph("dag_20"), graph("dag_20_perturbed")
     assert nx.is_directed_acyclic_graph(est)
     assert set(est.nodes) == set(true.nodes)
     t, e = set(true.edges), set(est.edges)
     reversed_ = {(u, v) for u, v in t - e if (v, u) in e}
     removed = t - e - reversed_
     assert len(removed) == round(0.1 * len(t))
-    assert 0 < len(reversed_) <= round(0.1 * len(t))  # cycle-creating reversals are skipped
+    assert 0 < len(reversed_) <= round(0.1 * len(t))
     assert e - {(v, u) for u, v in reversed_} <= t  # nothing is added
-    assert est is not graph(f"dag_{n}_perturbed")
+    assert est is not graph("dag_20_perturbed")
 
 
 def test_perturbed_dag_spec_is_deterministic():
@@ -247,29 +231,18 @@ def test_independencies_are_deterministic_valid_and_sized():
     from benchmarks._fixtures import independencies
     from tools.build_fixtures import independencies_spec
 
-    for name, n_vars, n_assertions, seed in (("indep_small", 7, 5, 0), ("indep_large", 12, 12, 1)):
-        assert independencies_spec(n_vars, n_assertions, rng=seed) == load_spec(name)
-        ind = independencies(name)
-        assert len(ind.get_assertions()) == n_assertions
-        assert len(set(ind.get_assertions())) == n_assertions
-        assert ind.get_all_variables() <= set(load_spec(name)["nodes"])
-        assert all(a.event1 and a.event2 and not (a.event1 & a.event2 or a.event1 & a.event3 or a.event2 & a.event3)
-                   for a in ind.get_assertions())
-        assert independencies(name) is not ind
+    name, n_vars, n_assertions, seed = "indep_small", 7, 5, 0
+    assert independencies_spec(n_vars, n_assertions, rng=seed) == load_spec(name)
+    ind = independencies(name)
+    assert len(ind.get_assertions()) == n_assertions
+    assert len(set(ind.get_assertions())) == n_assertions
+    assert ind.get_all_variables() <= set(load_spec(name)["nodes"])
+    assert all(a.event1 and a.event2 and not (a.event1 & a.event2 or a.event1 & a.event3 or a.event2 & a.event3)
+               for a in ind.get_assertions())
+    assert independencies(name) is not ind
 
 
-READWRITE_FILES = [
-    (fmt, name)
-    for fmt, names in (
-        ("bif", ("asia", "andes")),
-        ("xmlbif", ("asia", "andes")),
-        ("xbn", ("asia", "andes")),
-        ("xdsl", ("asia", "andes")),
-        ("uai", ("asia", "alarm")),
-        ("net", ("asia", "alarm")),
-    )
-    for name in names
-]
+READWRITE_FILES = [(fmt, "asia") for fmt in ("bif", "xmlbif", "xbn", "xdsl", "uai", "net")]
 
 
 @pytest.mark.parametrize("fmt, name", READWRITE_FILES)
@@ -288,20 +261,19 @@ def test_readwrite_discrete_files_read_back_to_their_model(fmt, name):
         assert set(read.edges) == set(model.edges)
 
 
-@pytest.mark.parametrize("name", ["random_gaussian_8", "arth150"])
-def test_readwrite_json_files_read_back_to_their_model(name):
+def test_readwrite_json_files_read_back_to_their_model():
     from pgmpy.readwrite import LGBNJSONReader
 
-    model = gaussian_bn(name)
-    read = LGBNJSONReader(string=_fixtures.readwrite_text("json", name)).read()
+    model = gaussian_bn("random_gaussian_8")
+    read = LGBNJSONReader(string=_fixtures.readwrite_text("json", "random_gaussian_8")).read()
     assert set(read.nodes) == set(model.nodes)
     assert set(read.edges) == set(model.edges)
 
 
-@pytest.mark.parametrize("name, n_states", [("rocksample", 2), ("state50", 50)])
-def test_readwrite_pomdpx_files_read_back_and_match_their_model_data(name, n_states):
+def test_readwrite_pomdpx_files_read_back_and_match_their_model_data():
     from pgmpy.readwrite import PomdpXReader, PomdpXWriter
 
+    name, n_states = "rocksample", 2
     reader = PomdpXReader(string=_fixtures.readwrite_text("pomdpx", name))
     variables = reader.get_variables()
     assert len(variables["StateVar"]) == n_states
@@ -311,19 +283,11 @@ def test_readwrite_pomdpx_files_read_back_and_match_their_model_data(name, n_sta
     assert data["state_transition_function"] == reader.get_state_transition_function()
     assert data["obs_function"] == reader.get_obs_function()
     assert data["reward_function"] == reader.get_reward_function()
-    # every conditional table names only declared variables
     declared = {v for kind in variables.values() for var in kind for k, v in var.items() if k.startswith("vname")}
     for table in data["initial_state_belief"] + data["state_transition_function"] + data["obs_function"]:
         assert {table["Var"], *table["Parent"]} - {"null"} <= declared
     assert _fixtures.pomdpx_model_data(name) is not _fixtures.pomdpx_model_data(name)
     assert PomdpXWriter(model_data=_fixtures.pomdpx_model_data(name)).get_variables()
-
-
-def test_state50_pomdpx_is_deterministic():
-    from tools.build_fixtures import pomdpx_state50
-
-    assert pomdpx_state50() == _fixtures.readwrite_text("pomdpx", "state50")
-    assert pomdpx_state50(rng=1) != pomdpx_state50()
 
 
 def test_readwrite_generation_is_deterministic():

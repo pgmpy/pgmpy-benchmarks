@@ -1,0 +1,96 @@
+name: Nightly benchmarks
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      bench_regex:
+        description: Run only the benchmarks matching this regex (empty runs all of them)
+
+concurrency:
+  group: nightly-benchmarks
+
+permissions:
+  contents: write # push the results and gh-pages branches
+  issues: write # open an issue when the run fails
+
+jobs:
+  benchmarks:
+    if: github.repository == 'pgmpy/pgmpy-benchmarks'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout pgmpy-benchmarks
+        uses: actions/checkout@v6
+        with:
+          path: pgmpy-benchmarks
+
+      - name: Checkout benchmark results
+        uses: actions/checkout@v6
+        with:
+          ref: results
+          path: results-store
+
+      - name: Checkout pgmpy
+        uses: actions/checkout@v6
+        with:
+          repository: pgmpy/pgmpy
+          ref: dev
+          fetch-depth: 0
+          path: pgmpy
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pgmpy-benchmarks/requirements-ci.txt
+
+      - name: Cache Hugging Face datasets
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-pgmpy-benchmarks-${{ hashFiles('pgmpy-benchmarks/benchmarks/datasets.py') }}
+          restore-keys: hf-pgmpy-benchmarks-
+
+      - name: Install benchmark tooling
+        run: pip install -r pgmpy-benchmarks/requirements-ci.txt
+
+      - name: Configure git identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run benchmarks, publish results
+        working-directory: pgmpy-benchmarks
+        env:
+          BENCH_REGEX: ${{ inputs.bench_regex }}
+          SUMMARY_FILE: ${{ runner.temp }}/summary.txt
+        run: ci/nightly.sh ../results-store
+
+      - name: Open or update the failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SUMMARY_FILE: ${{ runner.temp }}/summary.txt
+          TITLE: Nightly benchmarks failed
+        run: |
+          body=$(mktemp)
+          {
+            echo "The nightly benchmark run failed: $RUN_URL"
+            if [ -s "$SUMMARY_FILE" ]; then
+              echo
+              cat "$SUMMARY_FILE"
+            fi
+          } > "$body"
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$body"
+          fi

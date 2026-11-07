@@ -1,22 +1,9 @@
-"""Generate the frozen benchmark fixtures in benchmarks/data/*.json.gz.
-
-Run once (needs network for load_model) and commit the output, so base and head
-commits are always benchmarked on identical inputs:
+"""Generate the frozen fixtures in benchmarks/data (needs network for load_model and a pgmpy checkout for the PomdpX document).
 
     python tools/build_fixtures.py --out benchmarks/data
 
-To add a fixture, write a ``spec_<name>`` function returning a spec dict and
-register it in ``SPECS``. Specs are stored with nodes in topological order.
-
-Non-DAG graph derivations (pgmpy conversions at build time, then frozen):
-  pdag: ``DAG.to_pdag()`` (the CPDAG).
-  ug:   ``DAG.moralize()`` (moral graph).
-  admg: ``DAG.to_admg()`` (latent projection) of a seeded random DAG with
-        10% more nodes, a seeded subset of which is marked latent, so exactly
-        20/500 observed nodes remain.
-  mag:  the admg above, with each bidirected edge between a node and one of its
-        ancestors dropped (keeps the graph ancestral). Maximality is checked
-        (and printed) only for the small graph; it is too slow at 500 nodes.
+Derived graphs (pgmpy conversions at build time, then frozen): pdag = to_pdag, ug = moralize, admg = to_admg of a seeded
+DAG with 10% extra latent nodes, mag = admg with bidirected edges between a node and its ancestor dropped.
 """
 
 import argparse
@@ -32,7 +19,7 @@ import numpy as np
 
 from pgmpy.base import DAG
 from pgmpy.example_models import load_model
-from pgmpy.models import DiscreteBayesianNetwork, LinearGaussianBayesianNetwork
+from pgmpy.models import LinearGaussianBayesianNetwork
 
 LATENT_FRACTION = 0.1
 
@@ -107,7 +94,7 @@ def _total_nodes(n):
 
 
 def _admg(dag, n_latent, rng=0):
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(rng)
     nodes = list(dag.nodes())
     latents = set(rng.choice(nodes, size=n_latent, replace=False).tolist())
     marked = DAG(dag.edges())
@@ -137,19 +124,11 @@ def mag_spec(dag, n_latent):
     bidirected = [(u, v) for u, v, t in edges if t == "<>" and u not in ancestors[v] and v not in ancestors[u]]
     spec = graph_spec("mag", admg.nodes(), directed=directed, bidirected=bidirected)
     mag = MAG(edge_list=[(u, v, "->") for u, v in directed] + [(u, v, "<>") for u, v in bidirected])
-    if len(spec["nodes"]) <= 50:  # all-pairs inducing-path check is far too slow at 500
-        print(f"  mag n={len(spec['nodes'])} is_maximal={mag.is_maximal()}")
+    print(f"  mag n={len(spec['nodes'])} is_maximal={mag.is_maximal()}")
     return spec
 
 
 def junction_tree_spec(model):
-    # pgmpy builds a junction tree only for connected models (andes has 4 components): keep the largest.
-    keep = max(nx.weakly_connected_components(model), key=len)
-    if len(keep) < len(model.nodes()):
-        print(f"  jt: using largest component, {len(keep)} of {len(model.nodes())} nodes")
-        sub = DiscreteBayesianNetwork([(u, v) for u, v in model.edges() if u in keep])
-        sub.add_cpds(*[model.get_cpds(n) for n in keep])
-        model = sub
     jt = model.to_junction_tree()
     cliques = [list(c) for c in jt.nodes()]
     index = {tuple(c): i for i, c in enumerate(jt.nodes())}
@@ -193,7 +172,7 @@ def dbn_spec(n_vars, intra_prob, inter_prob, interface_every=2, n_states=2, rng=
     Nodes are listed in topological order, slice 0 then slice 1. A parent is ``[name, slice]``; ``values``
     has one column per parent assignment (first parent varies slowest).
     """
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(rng)
 
     def near(i, j):
         return band is None or abs(i - j) <= band
@@ -219,13 +198,7 @@ def dbn_spec(n_vars, intra_prob, inter_prob, interface_every=2, n_states=2, rng=
 
 
 def perturbed_dag_spec(dag_spec_, fraction=0.1, rng=0):
-    """A frozen "estimated" DAG: ``fraction`` of the edges reversed and ``fraction`` of the others removed.
-
-    Edges are taken in sorted order and chosen with ``numpy.random.default_rng(rng)``. Reversals are applied
-    in sorted order; a reversal ``u -> v`` that would close a cycle (another directed path ``u ~> v`` exists)
-    is skipped and the edge stays as it was. Removals are drawn from the edges that were not selected for
-    reversal, so the two sets never overlap.
-    """
+    """``fraction`` of the sorted edges reversed (skipping reversals that close a cycle) and ``fraction`` of the rest removed, via ``default_rng(rng)``."""
     edges = sorted(tuple(e) for e in dag_spec_["directed"])
     n = round(fraction * len(edges))
     rng = np.random.default_rng(rng)
@@ -250,8 +223,7 @@ def independencies_spec(n_vars, n_assertions, rng=0):
     """Random conditional independence assertions ``[X, Y, Z]`` over ``V0..V<n_vars-1>``.
 
     ``X`` has 1-2 variables, ``Y`` 1-3 and ``Z`` 0-2, drawn disjoint with ``default_rng(rng)``; duplicate
-    assertions are redrawn. The sizes are tuned so that ``Independencies.closure`` takes ~0.05 s (small) /
-    ~1.6 s (large).
+    assertions are redrawn. The sizes are tuned so that ``Independencies.closure`` takes ~0.05 s.
     """
     rng = np.random.default_rng(rng)
     names = [f"V{i}" for i in range(n_vars)]
@@ -268,161 +240,58 @@ def independencies_spec(n_vars, n_assertions, rng=0):
 def build_derived_specs(out):
     """Specs derived from committed ones, needing no network: the perturbed DAGs and the independencies."""
     specs = {}
-    for n in (20, 500):
-        with gzip.open(out / f"dag_{n}.json.gz", "rt") as f:
-            specs[f"dag_{n}_perturbed"] = perturbed_dag_spec(json.load(f))
+    with gzip.open(out / "dag_20.json.gz", "rt") as f:
+        specs["dag_20_perturbed"] = perturbed_dag_spec(json.load(f))
     specs["indep_small"] = independencies_spec(7, 5, rng=0)
-    specs["indep_large"] = independencies_spec(12, 12, rng=1)
     return specs
 
 
 def build_dbn_specs():
-    # DBNInference multiplies a whole slice into one table, so dbn_50 (2 ** 50 cells) can be built but not
-    # queried, and dbn_20 is the largest slice whose forward / backward inference takes about 0.3 s.
-    return {
-        "dbn_5": dbn_spec(5, 0.4, 0.3, interface_every=2),
-        "dbn_20": dbn_spec(20, 0.2, 0.1, interface_every=7, band=2),
-        "dbn_50": dbn_spec(50, 0.2, 0.1, interface_every=10, band=2),
-    }
+    return {"dbn_5": dbn_spec(5, 0.4, 0.3, interface_every=2)}
 
 
 def build_specs():
     specs = {}
     discrete = {}
-    for name in ["asia", "alarm", "andes", "munin", "pathfinder"]:
+    for name in ["asia", "alarm"]:
         discrete[name] = load_model(f"bnlearn/{name}")
         specs[name] = discrete_spec(discrete[name])
-    specs["random_discrete_200"] = discrete_spec(
-        DiscreteBayesianNetwork.get_random(n_nodes=200, edge_prob=0.02, n_states=3, rng=0)
-    )
 
     specs["random_gaussian_8"] = gaussian_spec(
         LinearGaussianBayesianNetwork.get_random(n_nodes=8, edge_prob=0.3, rng=0)
     )
-    for name in ["ecoli70", "arth150"]:
-        specs[name] = gaussian_spec(load_model(f"bnlearn/{name}"))
 
-    for n, p in [(20, 0.15), (500, 0.005)]:
-        dag = DAG.get_random(n_nodes=n, edge_prob=p, rng=0)
-        print(f"graphs n={n}")
-        specs[f"dag_{n}"] = dag_spec(dag)
-        specs[f"pdag_{n}"] = pdag_spec(dag)
-        # Project a larger DAG so that exactly n observed nodes remain.
-        big = DAG.get_random(n_nodes=_total_nodes(n), edge_prob=p, rng=0)
-        n_latent = _total_nodes(n) - n
-        specs[f"admg_{n}"] = admg_spec(big, n_latent)
-        specs[f"mag_{n}"] = mag_spec(big, n_latent)
-        specs[f"ug_{n}"] = ug_spec(dag)
-        specs[f"syntax_{n}"] = syntax_spec(dag)
+    n, p = 20, 0.15
+    dag = DAG.get_random(n_nodes=n, edge_prob=p, rng=0)
+    print(f"graphs n={n}")
+    specs[f"dag_{n}"] = dag_spec(dag)
+    specs[f"pdag_{n}"] = pdag_spec(dag)
+    big = DAG.get_random(n_nodes=_total_nodes(n), edge_prob=p, rng=0)
+    n_latent = _total_nodes(n) - n
+    specs[f"admg_{n}"] = admg_spec(big, n_latent)
+    specs[f"mag_{n}"] = mag_spec(big, n_latent)
+    specs[f"ug_{n}"] = ug_spec(dag)
+    specs[f"syntax_{n}"] = syntax_spec(dag)
 
-    for name in ["alarm", "andes"]:
-        specs[f"jt_{name}"] = junction_tree_spec(discrete[name])
+    specs["jt_alarm"] = junction_tree_spec(discrete["alarm"])
 
     specs.update(build_dbn_specs())
     return specs
 
 
-# --- readwrite files (benchmarks/data/readwrite/<name>.<format>.gz) --------------------------------------------------
-#
-# Frozen inputs for benchmarks/readwrite.py, written by the pgmpy writers (fine here: this is the one-off generator)
-# and gzip-compressed with mtime=0 so that regenerating them is byte-identical.
-#   discrete formats: asia (fast) and andes (slow) in bif / xmlbif / xbn / xdsl. The UAI and NET readers are too slow
-#     on andes (18 s and 11 s, quadratic pyparsing scans), so their slow file is alarm (0.9 s and 0.3 s).
-#     UAI is written with round_values=4: UAIReader cannot parse scientific notation ("1e-05").
-#   json (LGBNJSON): random_gaussian_8 (fast) and arth150 (slow).
-#   pomdpx: ``rocksample``, the document of pgmpy's own test suite, and ``state50``, a synthetic one with 50 state
-#     variables. ``<name>.model.json`` holds the dict PomdpXWriter takes as ``model_data`` (PomdpX has no model class).
+# --- readwrite files: written by the pgmpy writers, gzipped with mtime=0 so regeneration is byte-identical; UAI uses round_values=4 ---
 
-READWRITE_DISCRETE = {
-    "bif": ("asia", "andes"),
-    "xmlbif": ("asia", "andes"),
-    "xbn": ("asia", "andes"),
-    "xdsl": ("asia", "andes"),
-    "uai": ("asia", "alarm"),
-    "net": ("asia", "alarm"),
-}
-POMDPX_TEST_FILE = "pgmpy/tests/test_readwrite/test_PomdpX.py"  # relative to the pgmpy checkout; its ``string`` fixture
+READWRITE_DISCRETE = {fmt: ("asia",) for fmt in ("bif", "xmlbif", "xbn", "xdsl", "uai", "net")}
+POMDPX_TEST_FILE = "pgmpy/tests/test_readwrite/test_PomdpX.py"
 
 
 def pomdpx_rocksample(pgmpy_dir):
-    """The RockSample document of pgmpy's test suite: the return value of the ``string`` fixture."""
     tree = ast.parse((Path(pgmpy_dir) / POMDPX_TEST_FILE).read_text(encoding="utf-8"))
     (fixture,) = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "string"]
     return ast.literal_eval(fixture.body[-1].value)
 
 
-def _probs(rng, n):
-    p = rng.random(n) + 0.05
-    return " ".join(f"{v:.3f}" for v in p / p.sum())
-
-
-def pomdpx_state50(n_states=50, n_values=3, n_actions=4, n_obs=5, rng=0):
-    """A synthetic PomdpX document with ``n_states`` state variables of ``n_values`` values each.
-
-    One action variable, ``n_obs`` observation variables and one reward. Every state variable's next value depends
-    on the action, its own previous value and one other (seeded) previous state variable; each observation on the
-    action and two (seeded) current state variables; the reward on the action and two previous states. All
-    conditional tables are full ``TBL`` ones with random normalised rows.
-    """
-    rng = np.random.default_rng(rng)
-    actions = [f"a{k}" for k in range(n_actions)]
-    values = [f"s{k}" for k in range(n_values)]
-    obs_values = [f"o{k}" for k in range(n_values)]
-
-    def entries(n_parents, tag, table):
-        out = []
-        for combo in np.ndindex(*([n_actions] + [n_values] * n_parents)):
-            instance = " ".join([actions[combo[0]]] + [values[v] for v in combo[1:]])
-            out.append(f"<Entry><Instance>{instance}</Instance><{tag}>{table()}</{tag}></Entry>")
-        return "".join(out)
-
-    def cond(var, parents, tag="CondProb", table_tag="ProbTable", table=lambda: _probs(rng, n_values)):
-        return (
-            f"<{tag}><Var>{var}</Var><Parent>{' '.join(parents)}</Parent><Parameter type=\"TBL\">"
-            f"{entries(len(parents) - 1, table_tag, table)}</Parameter></{tag}>"
-        )
-
-    state_vars = "".join(
-        f'<StateVar vnamePrev="s{i}_0" vnameCurr="s{i}_1"' + (' fullyObs="true"' if i % 10 == 0 else "")
-        + f"><NumValues>{n_values}</NumValues></StateVar>"
-        for i in range(n_states)
-    )
-    obs_vars = "".join(f'<ObsVar vname="o{k}"><ValueEnum>{" ".join(obs_values)}</ValueEnum></ObsVar>' for k in range(n_obs))
-    belief = "".join(
-        f'<CondProb><Var>s{i}_0</Var><Parent>null</Parent><Parameter type="TBL"><Entry><Instance>-</Instance>'
-        f"<ProbTable>{_probs(rng, n_values)}</ProbTable></Entry></Parameter></CondProb>"
-        for i in range(n_states)
-    )
-    transition = "".join(
-        cond(f"s{i}_1", ["action_0", f"s{i}_0", f"s{rng.choice([j for j in range(n_states) if j != i])}_0"])
-        for i in range(n_states)
-    )
-    observation = "".join(
-        cond(f"o{k}", ["action_0", *(f"s{j}_1" for j in rng.choice(n_states, size=2, replace=False))])
-        for k in range(n_obs)
-    )
-    reward = cond(
-        "reward_0",
-        ["action_0", *(f"s{j}_0" for j in rng.choice(n_states, size=2, replace=False))],
-        tag="Func",
-        table_tag="ValueTable",
-        table=lambda: str(int(rng.integers(-10, 11))),
-    )
-    return (
-        '<pomdpx version="1.0" id="state50">'
-        f"<Description>Synthetic problem with {n_states} state variables.</Description><Discount>0.95</Discount>"
-        f"<Variable>{state_vars}{obs_vars}"
-        f'<ActionVar vname="action_0"><ValueEnum>{" ".join(actions)}</ValueEnum></ActionVar>'
-        '<RewardVar vname="reward_0"/></Variable>'
-        f"<InitialStateBelief>{belief}</InitialStateBelief>"
-        f"<StateTransitionFunction>{transition}</StateTransitionFunction>"
-        f"<ObsFunction>{observation}</ObsFunction>"
-        f"<RewardFunction>{reward}</RewardFunction></pomdpx>"
-    )
-
-
 def pomdpx_model_data(string):
-    """The dict PomdpXWriter takes as ``model_data``, read from a document by PomdpXReader (generator only)."""
     from pgmpy.readwrite import PomdpXReader
 
     reader = PomdpXReader(string=string)
@@ -441,10 +310,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def build_readwrite_files(pgmpy_dir=None, with_rocksample=True):
-    """{file name: text} for benchmarks/data/readwrite, from the committed specs (no network).
-
-    ``with_rocksample=False`` leaves out the document copied from pgmpy's test suite (and so needs no checkout).
-    """
+    """{file name: text} for benchmarks/data/readwrite, from the committed specs; ``with_rocksample=False`` needs no pgmpy checkout."""
     sys.path.insert(0, str(REPO_ROOT))
     from benchmarks._fixtures import discrete_bn, gaussian_bn
     from pgmpy.readwrite import (
@@ -470,9 +336,8 @@ def build_readwrite_files(pgmpy_dir=None, with_rocksample=True):
         for name in names:
             random.seed(0)  # XDSLWriter draws node positions from the global ``random`` module
             files[f"{name}.{fmt}"] = str(writers[fmt](discrete_bn(name)))
-    for name in ("random_gaussian_8", "arth150"):
-        files[f"{name}.json"] = str(LGBNJSONWriter(gaussian_bn(name)))
-    documents = {"state50": pomdpx_state50()}
+    files["random_gaussian_8.json"] = str(LGBNJSONWriter(gaussian_bn("random_gaussian_8")))
+    documents = {}
     if with_rocksample:
         documents["rocksample"] = pomdpx_rocksample(pgmpy_dir or REPO_ROOT.parent / "pgmpy")
     for name, text in documents.items():

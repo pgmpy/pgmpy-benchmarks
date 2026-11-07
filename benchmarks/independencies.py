@@ -1,20 +1,15 @@
 """Benchmarks for ``pgmpy.independencies``.
 
-Inputs are the frozen assertion lists ``indep_small`` (fast: 5 assertions over 7 variables) and
-``indep_large`` (slow: 12 assertions over 12 variables), built with ``_fixtures.independencies``
+Inputs are the frozen assertion list ``indep_small`` (5 assertions over 7 variables), built with ``_fixtures.independencies``
 (``tools/build_fixtures.independencies_spec``: events of 1-2, 1-3 and 0-2 variables, seeded).
 
 ``closure`` is exponential in the number of variables and assertions (semi-graphoid axioms applied until
-no new assertion appears), and ``entails``, ``is_equivalent`` and ``reduce`` are built on it. The slow
-fixture is sized to the per-call cap: ``indep_large`` has a closure of 787 assertions that takes 1.6 s
-(``PYTHONHASHSEED=0``). Neighbouring seeds and sizes reach 2 s to 30 s (for example 8 variables and 12
-assertions: 22 s), so 12 variables and 12 assertions with seed 1 is the largest chosen that keeps
-the heaviest methods under 5 s. Measured slow-tier calls: ``closure`` 1.6 s, ``entails`` 1.6 s (the
-entailed set is the first two assertions), ``is_equivalent`` 3.2 s (two closures, against an equal
-copy), ``reduce`` 4.5 s. The fast fixture's closure has about 130 assertions and takes 0.05 s
-(``is_equivalent`` 0.09 s).
+no new assertion appears), and ``entails``, ``is_equivalent`` and ``reduce`` are built on it. The
+fixture's closure has about 130 assertions and takes 0.05 s (``PYTHONHASHSEED=0``;
+``is_equivalent`` 0.09 s, two closures against an equal copy; ``entails`` is checked against the
+first two assertions).
 
-Read-only methods share one ``Independencies`` per tier (memoized). ``add_assertions`` mutates, so it
+Read-only methods share one ``Independencies`` (memoized). ``add_assertions`` mutates, so it
 gets a fresh object on every call. ``contains`` looks up the last assertion of the list.
 
 Skipped:
@@ -25,59 +20,59 @@ Skipped:
 from functools import cache
 
 from benchmarks._fixtures import independencies
-from benchmarks._tiers import TIERS, Bench
+from benchmarks._bench import Bench
 
 from pgmpy.independencies import IndependenceAssertion, Independencies
 
-FIXTURE = {"fast": "indep_small", "slow": "indep_large"}
+FIXTURE = "indep_small"
 
 
 @cache
-def shared(tier):
-    """The tier's ``Independencies`` and its last assertion; only read by the benchmarks."""
-    ind = independencies(FIXTURE[tier])
+def shared():
+    """The ``Independencies`` and its last assertion; only read by the benchmarks."""
+    ind = independencies(FIXTURE)
     return ind, ind.get_assertions()[-1]
 
 
 class TimeIndependencies(Bench):
-    def prepare(self, tier):
-        self.ind, self.last = shared(tier)
+    def setup(self):
+        self.ind, self.last = shared()
 
-    def time_init(self, tier):
+    def time_init(self):
         Independencies(*[a.get_assertion() for a in self.ind.get_assertions()])
 
-    def time_add_assertions(self, tier):
-        independencies(FIXTURE[tier]).add_assertions(*[a.get_assertion() for a in self.ind.get_assertions()[:2]])
+    def time_add_assertions(self):
+        independencies(FIXTURE).add_assertions(*[a.get_assertion() for a in self.ind.get_assertions()[:2]])
 
-    def time_contains(self, tier):
+    def time_contains(self):
         self.last in self.ind
 
-    def time_get_all_variables(self, tier):
+    def time_get_all_variables(self):
         self.ind.get_all_variables()
 
-    def time_latex_string(self, tier):
+    def time_latex_string(self):
         self.ind.latex_string()
 
-    def time_closure(self, tier):
+    def time_closure(self):
         self.ind.closure()
 
-    def time_entails(self, tier):
+    def time_entails(self):
         self.ind.entails(Independencies(*self.ind.get_assertions()[:2]))
 
-    def time_is_equivalent(self, tier):
-        self.ind.is_equivalent(independencies(FIXTURE[tier]))
+    def time_is_equivalent(self):
+        self.ind.is_equivalent(independencies(FIXTURE))
 
-    def time_reduce(self, tier):
+    def time_reduce(self):
         self.ind.reduce()
 
 
 class TimeIndependenceAssertion(Bench):
-    def prepare(self, tier):
-        _, self.assertion = shared(tier)
+    def setup(self):
+        _, self.assertion = shared()
         self.events = self.assertion.get_assertion()
 
-    def time_init(self, tier):
+    def time_init(self):
         IndependenceAssertion(*self.events)
 
-    def time_latex_string(self, tier):
+    def time_latex_string(self):
         self.assertion.latex_string()
