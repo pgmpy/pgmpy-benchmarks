@@ -90,7 +90,7 @@ moved. It writes the results to `results` and rebuilds `gh-pages`, even when the
   `gh workflow enable nightly.yml`.
 
 When `dev` changes a public API that a benchmark uses, the benchmark errors and the nightly fails. Update the benchmark
-on `master`; the night after such a change fails once, so close the issue after it.
+on `main`; the night after such a change fails once, so close the issue after it.
 
 ## One-time maintainer setup
 
