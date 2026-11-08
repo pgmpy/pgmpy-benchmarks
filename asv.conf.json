@@ -7,7 +7,16 @@
     "branches": ["dev"],
     "environment_type": "virtualenv",
     "pythons": ["3.14"],
-    "matrix": {"req": {"pip+asv_runner": ["0.3.2"]}},
+    "matrix": {
+        "req": {"pip+asv_runner": ["0.3.2"]},
+        "env_nobuild": {
+            "PYTHONHASHSEED": "0",
+            "OMP_NUM_THREADS": "1",
+            "OPENBLAS_NUM_THREADS": "1",
+            "MKL_NUM_THREADS": "1",
+            "TQDM_DISABLE": "1"
+        }
+    },
     "build_command": ["python -mpip wheel --no-deps -w {build_cache_dir} {build_dir}"],
     "uninstall_command": ["return-code=any python -mpip uninstall -y pgmpy"],
     "benchmark_dir": "benchmarks",

@@ -4,9 +4,6 @@ on:
   schedule:
     - cron: "0 3 * * *"
   workflow_dispatch:
-    inputs:
-      bench_regex:
-        description: Run only the benchmarks matching this regex (empty runs all of them)
 
 concurrency:
   group: nightly-benchmarks
@@ -20,6 +17,8 @@ jobs:
     if: github.repository == 'pgmpy/pgmpy-benchmarks'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      MACHINE: github-ubuntu-latest
 
     steps:
       - name: Checkout pgmpy-benchmarks
@@ -38,12 +37,13 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Cache Hugging Face datasets
+      # Keep the Hugging Face download directory between runs: restore the newest copy, save a new one after the run.
+      - name: Cache Hugging Face downloads
         uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
-          key: hf-pgmpy-benchmarks-${{ hashFiles('benchmarks/datasets.py', 'benchmarks/_fixtures.py') }}
-          restore-keys: hf-pgmpy-benchmarks-
+          key: huggingface-${{ github.run_id }}
+          restore-keys: huggingface-
 
       - name: Install benchmark tooling
         run: pip install --group asv
@@ -53,32 +53,39 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Run benchmarks, publish results
-        env:
-          BENCH_REGEX: ${{ inputs.bench_regex }}
-          SUMMARY_FILE: ${{ runner.temp }}/summary.txt
-        run: ci/nightly.sh
+      # `asv run NEW` exits 1 when no dev commit is newer than the newest one with results, so stop before it in that case.
+      - name: Run benchmarks
+        id: bench
+        run: |
+          head=$(git ls-remote https://github.com/pgmpy/pgmpy.git refs/heads/dev | cut -f1)
+          if compgen -G "results/$MACHINE/${head:0:8}-*.json" > /dev/null; then
+            echo "dev ($head) already has results; nothing to benchmark"
+            exit 0
+          fi
+          asv machine --yes --machine "$MACHINE"
+          asv run --show-stderr --machine "$MACHINE" NEW
+
+      # Also when a benchmark errored (asv exits 2), so the dashboard shows the error.
+      - name: Save the results, publish the dashboard
+        if: ${{ !cancelled() && steps.bench.conclusion != 'skipped' }}
+        run: |
+          git -C results add -A
+          git -C results diff --cached --quiet && exit 0
+          git -C results commit -m "Nightly results $(date -u +%F)"
+          git -C results push
+          asv gh-pages --rewrite
 
       - name: Open or update the failure issue
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SUMMARY_FILE: ${{ runner.temp }}/summary.txt
+          GH_REPO: ${{ github.repository }}
           TITLE: Nightly benchmarks failed
+          BODY: "The nightly benchmark run failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         run: |
-          body=$(mktemp)
-          {
-            echo "The nightly benchmark run failed: $RUN_URL"
-            if [ -s "$SUMMARY_FILE" ]; then
-              echo
-              cat "$SUMMARY_FILE"
-            fi
-          } > "$body"
-          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')
+          number=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')
           if [ -n "$number" ]; then
-            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+            gh issue comment "$number" --body "$BODY"
           else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$body"
+            gh issue create --title "$TITLE" --body "$BODY"
           fi
