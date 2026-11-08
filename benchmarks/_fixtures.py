@@ -1,4 +1,4 @@
-"""Benchmark inputs, built with pgmpy and fixed seeds. Each input is built once per process; every caller gets a copy."""
+"""Benchmark inputs, built once per process with pgmpy and fixed seeds."""
 
 import copy
 import random
@@ -25,16 +25,18 @@ from pgmpy.models import (
 )
 from pgmpy.readwrite import BIFWriter, LGBNJSONWriter, NETWriter, PomdpXReader, UAIWriter, XBNWriter, XDSLWriter, XMLBIFWriter
 
-DATA_DIR = Path(__file__).parent / "data"
 EDGE_PROB = 0.15
+GRAPH_NODES = 20
 LATENT_FRACTION = 0.1
 DBN_SLICES = 3
 
 
 def fresh(build):
-    """Cache ``build`` and give every caller a deep copy (``setup`` re-runs before each timed call; some methods mutate)."""
+    """Cache ``build``. Each call returns a deep copy (some benchmarks mutate their input); ``.shared`` caches one copy."""
     cached = cache(build)
-    return wraps(build)(lambda *args, **kwargs: copy.deepcopy(cached(*args, **kwargs)))
+    copied = wraps(build)(lambda *args, **kwargs: copy.deepcopy(cached(*args, **kwargs)))
+    copied.shared = cache(copied)
+    return copied
 
 
 def topological(model):
@@ -47,29 +49,20 @@ def discrete_bn(name):
 
 
 @fresh
-def gaussian_bn(name):
-    """``random_gaussian_<n>``."""
-    return LinearGaussianBayesianNetwork.get_random(n_nodes=int(name.rsplit("_", 1)[1]), edge_prob=0.3, rng=0)
+def gaussian_bn(n):
+    return LinearGaussianBayesianNetwork.get_random(n_nodes=n, edge_prob=0.3, rng=0)
 
 
 @fresh
-def graph(name):
-    """``<kind>_<n>`` (kind: dag, pdag, ug, admg or mag) or ``dag_<n>_perturbed``."""
-    kind, n, *perturbed = name.split("_")
-    n = int(n)
+def graph(kind):
     if kind in ("admg", "mag"):
-        admg = _admg(n)
+        admg = _admg(GRAPH_NODES)
         return admg if kind == "admg" else _mag(admg)
-    dag = DAG.get_random(n_nodes=n, edge_prob=EDGE_PROB, rng=0)
-    if kind == "pdag":
-        return dag.to_pdag()
-    if kind == "ug":
-        return dag.moralize()
-    return _perturbed(dag) if perturbed else dag
+    dag = DAG.get_random(n_nodes=GRAPH_NODES, edge_prob=EDGE_PROB, rng=0)
+    return {"dag": lambda: dag, "pdag": dag.to_pdag, "ug": dag.moralize, "perturbed": lambda: _perturbed(dag)}[kind]()
 
 
 def _admg(n):
-    """A random DAG over ``n`` nodes plus 10% more, with those extra nodes latent and projected out."""
     n_latent = max(1, round(n * LATENT_FRACTION))
     dag = DAG.get_random(n_nodes=n + n_latent, edge_prob=EDGE_PROB, rng=0)
     dag.latents = set(np.random.default_rng(0).choice(list(dag.nodes()), size=n_latent, replace=False).tolist())
@@ -77,7 +70,6 @@ def _admg(n):
 
 
 def _mag(admg):
-    """``admg`` without the bidirected edges between a node and its ancestor."""
     ancestors = {v: admg.get_ancestors(v) for v in admg.nodes()}
     edges = [
         (u, v, t)
@@ -90,7 +82,6 @@ def _mag(admg):
 
 
 def _perturbed(dag, fraction=0.1, rng=0):
-    """``dag`` with ``fraction`` of its sorted edges reversed (unless that closes a cycle) and as many others removed."""
     edges = sorted(dag.edges())
     n = round(fraction * len(edges))
     picked = np.random.default_rng(rng).permutation(len(edges))[: 2 * n]
@@ -104,8 +95,7 @@ def _perturbed(dag, fraction=0.1, rng=0):
 
 
 @fresh
-def independencies(name):
-    """``indep_small``: 5 distinct assertions [X, Y, Z] over V0..V6, with 1-2, 1-3 and 0-2 variables."""
+def independencies():
     rng = np.random.default_rng(0)
     names = [f"V{i}" for i in range(7)]
     assertions = []
@@ -119,14 +109,12 @@ def independencies(name):
 
 
 @cache
-def syntax(name):
-    """``syntax_<n>``: ``dag_<n>`` as lavaan and dagitty text."""
-    dag = graph(name.replace("syntax", "dag"))
+def syntax():
+    dag = graph("dag")
     return dag.to_lavaan(), dag.to_dagitty()
 
 
 def bare(model):
-    """A model of the same class with the nodes and edges of ``model`` and no CPDs or factors."""
     b = type(model)(model.edges())
     b.add_nodes_from(model.nodes)
     return b
@@ -142,7 +130,6 @@ def _cpds(name):
 
 
 def factors(name):
-    """One DiscreteFactor per CPD family, in topological order."""
     return [cpd.to_factor() for cpd in _cpds(name)]
 
 
@@ -151,10 +138,10 @@ def markov_network(name):
 
 
 def factor_graph(name):
-    return _factor_graph(topological(discrete_bn(name)), factors(name))
+    return factor_graph_from(topological(discrete_bn(name)), factors(name))
 
 
-def _factor_graph(variables, fs):
+def factor_graph_from(variables, fs):
     fg = FactorGraph()
     fg.add_nodes_from(variables)
     fg.add_nodes_from(fs)
@@ -164,7 +151,6 @@ def _factor_graph(variables, fs):
 
 
 def _reduced_factor(cpd, kept):
-    """Factor over ``[cpd.variable, *kept]`` from ``cpd``, averaged over the parents not in ``kept``."""
     parents = cpd.variables[1:]
     table = cpd.values
     dropped = tuple(1 + i for i, p in enumerate(parents) if p not in kept)
@@ -175,7 +161,6 @@ def _reduced_factor(cpd, kept):
 
 
 def bfs_prefix(edges, start, n_nodes):
-    """Induced DAG on the first ``n_nodes`` nodes of a sorted-neighbour BFS over the skeleton from ``start``."""
     neighbours = defaultdict(set)
     for p, c in edges:
         neighbours[p].add(c)
@@ -194,7 +179,7 @@ def bfs_prefix(edges, start, n_nodes):
 
 
 def pairwise_markov_network(name):
-    """Pairwise network for ``Mplp``: a factor per node (CPD averaged over parents) and per BN edge (child CPD averaged over other parents)."""
+    """Pairwise network for ``Mplp``: a factor per node and per BN edge, each CPD averaged over the other parents."""
     cpds = _cpds(name)
     edges, fs = [], []
     for cpd in cpds:
@@ -211,35 +196,25 @@ def pairwise_markov_network(name):
 @cache
 def _tree_kept_parents(name):
     model = discrete_bn(name)
-    root = {v: v for v in model.nodes()}
-
-    def find(v):
-        while root[v] != v:
-            root[v] = root[root[v]]
-            v = root[v]
-        return v
-
-    kept = {}
+    components, kept = nx.utils.UnionFind(), {}
     for node in sorted(model.nodes()):
         kept[node] = set()
         for p in sorted(model.get_parents(node)):
-            a, b = find(p), find(node)
-            if a != b:
-                root[a] = b
+            if components[p] != components[node]:
+                components.union(p, node)
                 kept[node].add(p)
     return kept
 
 
 def tree_factor_graph(name):
-    """Forest-shaped factor graph for ``BeliefPropagationWithMessagePassing``: each node keeps the parents that close no cycle (sorted order); dropped parents are averaged out."""
+    """Loop-free factor graph for ``BeliefPropagationWithMessagePassing``: each node keeps the parents that close no cycle."""
     kept = _tree_kept_parents(name)
     cpds = _cpds(name)
-    return _factor_graph([cpd.variable for cpd in cpds], [_reduced_factor(cpd, kept[cpd.variable]) for cpd in cpds])
+    return factor_graph_from([cpd.variable for cpd in cpds], [_reduced_factor(cpd, kept[cpd.variable]) for cpd in cpds])
 
 
 def junction_tree(name):
-    """``jt_<model>``: the junction tree of a bnlearn model."""
-    return discrete_bn(name.removeprefix("jt_")).to_junction_tree()
+    return discrete_bn(name).to_junction_tree()
 
 
 def random_factor(n_vars, card, seed=0):
@@ -252,7 +227,6 @@ def joint_chain(n_vars, seed=0):
     rng = np.random.default_rng(seed)
     names = [f"X{i}" for i in range(n_vars)]
     root = rng.dirichlet([1, 1])  # P(X0)
-    # cpts[i][child, parent]: columns sum to one.
     cpts = [rng.dirichlet([1, 1], size=2).T for _ in range(n_vars - 1)]
     joint = root
     for cpt in cpts:
@@ -287,15 +261,15 @@ def mixed_data(name, n_rows, seed=0):
     return df
 
 
-@cache
-def _sem_inputs(name, n_err_corr):
-    """SEM inputs on a gaussian model's edges (graph, lavaan, LISREL and RAM forms). Nodes with children are latent, leaves observed; edges are pruned so ``to_standard_lisrel`` works; the first ``2 * n_err_corr`` observed nodes get correlated errors."""
+@fresh
+def sem_inputs(name, n_err_corr):
+    """SEM inputs on a gaussian model's edges: nodes with children are latent, edges pruned so ``to_standard_lisrel`` works."""
     model = gaussian_bn(name)
     cpds = [model.get_cpds(v) for v in topological(model)]
     roots = {cpd.variable for cpd in cpds if not cpd.evidence}
     coefficient = {(p, cpd.variable): float(c) for cpd in cpds for p, c in zip(cpd.evidence, cpd.beta[1:])}
     changed = True
-    while changed:  # dropping edges can turn a node into a leaf, so repeat until stable
+    while changed:  # dropping edges can make new leaves
         changed = False
         has_child = {p for p, _ in coefficient}
         for child in {c for _, c in coefficient if c not in has_child}:
@@ -328,7 +302,7 @@ def _sem_inputs(name, n_err_corr):
     wedge_y = np.zeros((len(observed), n))
     for row, v in enumerate(observed):
         wedge_y[row, index[v]] = 1
-    # lavaan names are alphanumeric, and a regressor named like "111" would parse as an intercept ("y ~ 1").
+    # lavaan names are alphanumeric, and a regressor "111" would parse as an intercept ("y ~ 1").
     plain = {v: "v" + v.replace("_", "") for v in variables}
     lavaan = "\n".join(
         f"{plain[c]} ~ {' + '.join(plain[p] for p, c2 in ebunch if c2 == c)}"
@@ -364,7 +338,6 @@ def _sem_inputs(name, n_err_corr):
         "latents": latents,
         "err_corr": err_corr,
         "variables": variables,
-        "observed": observed,
         "B": B,
         "zeta": zeta,
         "wedge_y": wedge_y,
@@ -373,23 +346,11 @@ def _sem_inputs(name, n_err_corr):
     }
 
 
-def sem_inputs(name, n_err_corr):
-    """Structural equation model inputs of a gaussian model (see ``_sem_inputs``); fresh copies on every call."""
-    return {k: v.copy() if isinstance(v, (np.ndarray, list)) else v for k, v in _sem_inputs(name, n_err_corr).items()}
-
-
 @cache
-def dbn_spec(name, intra_prob=0.4, inter_prob=0.3, interface_every=2, n_states=2):
-    """``dbn_<n>``: a 2-TBN over ``V0..`` with numpy CPDs (``DynamicBayesianNetwork.get_random`` breaks ``DBNInference``).
-
-    * Every ``V(j-1) -> Vj`` intra-slice edge is present (a junction tree needs a connected slice), plus ``Vi -> Vj``
-      (i < j) with ``intra_prob``.
-    * Only every ``interface_every``-th variable has inter-slice edges: ``Vi(0) -> Vi(1)`` always and ``Vi(0) -> Vk(1)``
-      between interface variables with ``inter_prob``, so their sources and targets match (``backward_inference``)
-      and the interface clique stays small.
-    * The other variables have the same parents in both slices (``initialize_initial_state``).
-    """
-    n_vars = int(name.rsplit("_", 1)[1])
+def dbn_spec(n_vars, intra_prob=0.4, inter_prob=0.3, interface_every=2, n_states=2):
+    """2-TBN with numpy CPDs (``DynamicBayesianNetwork.get_random`` breaks ``DBNInference``). The chain ``V(j-1) -> Vj``
+    keeps a slice connected for the junction tree. Only every ``interface_every``-th variable has inter-slice edges, so
+    sources match targets (``backward_inference``); the others have the same parents in both slices."""
     rng = np.random.default_rng(0)
     names = [f"V{i}" for i in range(n_vars)]
     intra = {j: [i for i in range(j) if rng.random() < intra_prob or i == j - 1] for j in range(n_vars)}
@@ -404,8 +365,8 @@ def dbn_spec(name, intra_prob=0.4, inter_prob=0.3, interface_every=2, n_states=2
     return {"n_states": n_states, "variables": names, "nodes": nodes}
 
 
-def dbn(name):
-    spec = dbn_spec(name)
+def dbn(n_vars):
+    spec = dbn_spec(n_vars)
     k = spec["n_states"]
     model = DynamicBayesianNetwork()
     model.add_nodes_from(spec["variables"])
@@ -420,8 +381,8 @@ def dbn(name):
 
 
 @fresh
-def dbn_data(name, n_rows, seed=0):
-    return dbn(name).simulate(n_rows, n_time_slices=DBN_SLICES, rng=seed, show_progress=False)
+def dbn_data(n_vars, n_rows, seed=0):
+    return dbn(n_vars).simulate(n_rows, n_time_slices=DBN_SLICES, rng=seed, show_progress=False)
 
 
 def markov_chain_matrices(n_vars, n_states, seed=0):
@@ -444,13 +405,13 @@ def markov_chain_sample(n_vars, n_states, n_rows, seed=0):
 
 @cache
 def readwrite_text(fmt, name):
-    """A reader's input: ``name`` written by pgmpy's writer for ``fmt``. The PomdpX document is a file in ``DATA_DIR``."""
+    """A reader's input: ``name`` written by pgmpy's writer for ``fmt``."""
     if fmt == "pomdpx":
-        return (DATA_DIR / f"{name}.pomdpx").read_text(encoding="utf-8")
+        return (Path(__file__).parent / "data" / f"{name}.pomdpx").read_text(encoding="utf-8")
     if fmt == "json":
         return str(LGBNJSONWriter(gaussian_bn(name)))
-    writers = {"bif": BIFWriter, "xmlbif": XMLBIFWriter, "xbn": XBNWriter, "xdsl": XDSLWriter, "net": NETWriter}
-    writers["uai"] = lambda model: UAIWriter(model, round_values=4)  # UAIReader cannot parse "1e-05"
+    writers = {"bif": BIFWriter, "xmlbif": XMLBIFWriter, "xbn": XBNWriter, "xdsl": XDSLWriter, "net": NETWriter,
+               "uai": lambda model: UAIWriter(model, round_values=4)}  # UAIReader cannot parse "1e-05"
     random.seed(0)  # XDSLWriter draws node positions from the global random module
     return str(writers[fmt](discrete_bn(name)))
 
@@ -469,6 +430,6 @@ def pomdpx_model_data(name):
     }
 
 
-# Parsed at import: asv's forkserver imports the benchmarks once and forks every benchmark process from it.
+# Load at import: asv's forkserver imports the benchmarks once and forks each benchmark process from it.
 for _name in (DISCRETE, MODEL):
     discrete_bn(_name)

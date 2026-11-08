@@ -1,13 +1,8 @@
-"""Benchmarks for ``pgmpy.identification``.
-
-Roles: treatment = first sorted node with a descendant, outcome = its last sorted descendant (``X_10 -> X_8`` on ``dag_20``,
-``X_0 -> X_9`` on ``admg_20``). ``Adjustment`` and ``Frontdoor`` run on the DAG only (ADMG unsupported / only DAG supported);
-``Frontdoor`` uses a ``FRONTDOOR_NODES`` BFS prefix because its search is exponential when no set exists;
-``Adjustment`` omits ``variant="all"`` (powerset).
+"""Benchmarks for ``pgmpy.identification``. ``Adjustment`` and ``Frontdoor`` run on the DAG only, ``Frontdoor`` on a
+``FRONTDOOR_NODES`` BFS prefix (its search is exponential when no set exists).
 
 Skipped:
-    ID.__call__, Adjustment.__call__, Frontdoor.__call__: trivial (alias of ``identify``)
-    constructors: trivial
+    ID.__call__, Adjustment.__call__, Frontdoor.__call__ (alias of ``identify``), constructors: trivial
     ProbabilityNode.marginalize and the other tree-node classes: internal
 """
 
@@ -20,8 +15,7 @@ from benchmarks._bench import Bench
 
 from pgmpy.identification import ID, Adjustment, Frontdoor
 
-DAG_GRAPH = "dag_20"
-ADMG_GRAPH = "admg_20"
+DAG_GRAPH = "dag"
 FRONTDOOR_NODES = 12
 
 
@@ -34,17 +28,14 @@ def descendants(g, node):
 
 
 def treatment_outcome(g):
-    """First node (sorted) with a descendant, and the last of its descendants (sorted)."""
     for x in sorted(g.nodes()):
         below = sorted(descendants(g, x) - {x})
         if below:
             return x, below[-1]
-    raise ValueError("graph has no directed edge")
 
 
 @cache
 def causal_graph(name, n_nodes=None):
-    """Fixture (or its BFS prefix) with exposure/outcome roles."""
     g = graph(name)
     x, y = treatment_outcome(g)
     if n_nodes is not None:
@@ -69,7 +60,7 @@ def expression(name):
 
 class TimeID(Bench):
     def setup(self):
-        self.admg = causal_graph(ADMG_GRAPH)
+        self.admg = causal_graph("admg")
         self.dag = causal_graph(DAG_GRAPH)
         self.id = ID()
 

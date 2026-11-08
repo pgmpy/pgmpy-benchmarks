@@ -2,7 +2,7 @@
 
 ROWS = 1_000
 DISCRETE = "asia"
-GAUSSIAN = "random_gaussian_8"
+GAUSSIAN = 8
 MODEL = "alarm"
 
 

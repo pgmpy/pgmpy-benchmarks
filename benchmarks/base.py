@@ -1,8 +1,5 @@
 """Benchmarks for the graph classes in ``pgmpy.base``.
 
-Path-enumerating methods run on a ``SUBGRAPH_NODES``-sized prefix of the 20-node fixtures. Methods of the private bases
-(``_CoreGraph``, ``_GraphAlgorithms``, ``_GraphRolesMixin``) are timed once, through ADMG and DAG.
-
 Skipped:
     DAG.to_daft, DAG.to_graphviz: plotting
     DAG.in_degree_iter, DAG.out_degree_iter: trivial
@@ -22,13 +19,11 @@ SUBGRAPH_NODES = {
 
 
 def ends(g):
-    """First and last node in sorted order."""
     nodes = sorted(g.nodes)
     return nodes[0], nodes[-1]
 
 
 def leading_subgraph(g, k):
-    """Induced subgraph on the first k nodes in sorted order, as a new graph of the same class."""
     nodes = sorted(g.nodes)[:k]
     if isinstance(g, DAG):
         sub = DAG(g.subgraph(nodes).edges())
@@ -38,19 +33,18 @@ def leading_subgraph(g, k):
 
 
 def conditioning(g):
-    """The three nodes after the first one in sorted order."""
     return sorted(g.nodes)[1:4]
 
 
 class TimeDAG(Bench):
     def setup(self):
-        self.g = graph("dag_20")
+        self.g = graph("dag")
         self.first, self.last = ends(self.g)
         self.given = conditioning(self.g)
-        self.other = graph("dag_20")
+        self.other = graph("dag")
         self.rg = self.g.with_role("exposures", self.first).with_role("outcomes", self.last)
         self.small = leading_subgraph(self.g, SUBGRAPH_NODES["get_independencies"])
-        self.lavaan, self.dagitty = syntax("syntax_20")
+        self.lavaan, self.dagitty = syntax()
         self.strength_dag = DAG(gaussian_bn(GAUSSIAN).edges())
         self.strength_data = gaussian_data(GAUSSIAN, ROWS)
 
@@ -168,9 +162,8 @@ class TimeDAG(Bench):
 
 class TimePDAG(Bench):
     def setup(self):
-        self.g = graph("pdag_20")
+        self.g = graph("pdag")
         self.first, self.last = ends(self.g)
-        # first undirected edge
         self.u, self.v = min(tuple(sorted(e)) for e in self.g.undirected_edges)
 
     def time_chain_component(self):
@@ -200,10 +193,9 @@ class TimePDAG(Bench):
 
 class TimeADMG(Bench):
     def setup(self):
-        self.g = graph("admg_20")
+        self.g = graph("admg")
         self.first, self.last = ends(self.g)
         self.given = conditioning(self.g)
-        # first directed edge
         self.u, self.v, _ = min(self.g.get_edges(edge_types=["->"]))
         self.adj = self.g.to_adjacency()
         self.small = leading_subgraph(self.g, SUBGRAPH_NODES["paths"])
@@ -335,12 +327,11 @@ class TimeADMG(Bench):
 
 class TimeMAG(Bench):
     def setup(self):
-        self.g = graph("mag_20")
+        self.g = graph("mag")
         self.given = conditioning(self.g)
         self.small = leading_subgraph(self.g, SUBGRAPH_NODES["mag"])
-        small_nodes = sorted(self.small.nodes)
         self.u, self.v, _ = min(self.small.get_edges(edge_types=["->"]))
-        self.x = small_nodes[:1]
+        self.x = sorted(self.small.nodes)[:1]
 
     def time_is_maximal(self):
         self.small.is_maximal()
@@ -357,7 +348,7 @@ class TimeMAG(Bench):
 
 class TimeUndirectedGraph(Bench):
     def setup(self):
-        self.g = graph("ug_20")
+        self.g = graph("ug")
         self.first, self.last = ends(self.g)
         self.given = conditioning(self.g)
 

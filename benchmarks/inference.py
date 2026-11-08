@@ -1,20 +1,14 @@
 """Benchmarks for ``pgmpy.inference``.
 
-Query variables: the 4 lexicographically first non-root nodes; evidence: the last 2 nodes at their first state
-(``query_and_evidence``). Models: ``alarm`` except where the algorithm needs less: ``CausalInference.identification_method``
-(powerset) on ``asia``, ``estimate_ate`` on ``random_gaussian_8``, ``DBNInference`` on ``dbn_5``, ``Mplp`` on the pairwise network
-(node and edge factors only), ``BeliefPropagationWithMessagePassing`` on a loop-free factor graph (it recurses forever on loops).
-
 Skipped:
     CausalInference.is_valid_backdoor_adjustment_set, .get_all_backdoor_adjustment_sets,
     .is_valid_frontdoor_adjustment_set, .get_all_frontdoor_adjustment_sets: deprecated
-    BeliefPropagation.get_cliques, .get_clique_beliefs, .get_sepset_beliefs: trivial
-    Mplp.get_integrality_gap: trivial
+    BeliefPropagation.get_cliques, .get_clique_beliefs, .get_sepset_beliefs, Mplp.get_integrality_gap: trivial
     Mplp.query: unsupported (raises NotImplementedError)
 """
 
 import copy
-from functools import lru_cache
+from functools import cache
 
 import networkx as nx
 from benchmarks._fixtures import (
@@ -30,7 +24,7 @@ from benchmarks._fixtures import (
     tree_factor_graph,
 )
 from benchmarks._bench import DISCRETE, GAUSSIAN, MODEL, ROWS, Bench
-from benchmarks.models import DBN_MODEL, TREE_FIXTURE
+from benchmarks.models import DBN_VARS
 
 from pgmpy.inference import (
     ApproxInference,
@@ -53,27 +47,19 @@ def split(nodes, roots):
     return [n for n in nodes if n not in roots][:N_QUERY], nodes[-N_EVIDENCE:]
 
 
-@lru_cache(maxsize=None)
-def model(name):
-    return discrete_bn(name)
-
-
-@lru_cache(maxsize=None)
+@cache
 def query_and_evidence(name):
     """The 4 first non-root nodes (sorted) and the last 2 nodes (sorted) at their first state."""
-    m = model(name)
+    m = discrete_bn.shared(name)
     query, last = split(sorted(m.nodes), set(m.get_roots()))
     return query, first_states(m, last)
 
 
-@lru_cache(maxsize=None)
-def tree_graph(name):
-    return tree_factor_graph(name)
+tree_graph = cache(tree_factor_graph)
 
 
-@lru_cache(maxsize=None)
+@cache
 def tree_query_and_evidence(name):
-    """The same rule on the tree factor graph: roots have a single-variable factor, evidence is state 0."""
     fg = tree_graph(name)
     roots = {f.variables[0] for f in fg.get_factors() if len(f.variables) == 1}
     nodes = sorted(n for n in fg.nodes if isinstance(n, str))
@@ -81,35 +67,32 @@ def tree_query_and_evidence(name):
     return query, dict.fromkeys(last, 0)
 
 
-@lru_cache(maxsize=None)
+@cache
 def elimination_order(name):
-    m = model(name)
+    m = discrete_bn.shared(name)
     return MinNeighbors(m).get_elimination_order(nodes=set(m.nodes), show_progress=False)
 
 
-@lru_cache(maxsize=None)
+@cache
 def bp_query_and_evidence(tree):
-    """The query rule applied to the nodes of a junction tree fixture, with roots from the full network."""
-    m = model(MODEL)
+    m = discrete_bn.shared(MODEL)
     query, last = split(sorted({v for clique in junction_tree(tree).nodes() for v in clique}), set(m.get_roots()))
     return query, first_states(m, last)
 
 
-@lru_cache(maxsize=None)
+@cache
 def calibrated_bp(tree):
     return BeliefPropagation(junction_tree(tree))
 
 
-@lru_cache(maxsize=None)
+@cache
 def treatment_outcome(name):
-    """The first edge (sorted) whose tail has a parent and whose head has at least two parents."""
-    m = model(name)
+    m = discrete_bn.shared(name)
     return next((x, y) for x, y in sorted(m.edges()) if m.in_degree(x) >= 1 and m.in_degree(y) >= 2)
 
 
-@lru_cache(maxsize=None)
+@cache
 def ate_pair(name):
-    """The first edge (sorted) whose tail is a root and is the only path between its ends."""
     m = gaussian_bn(name)
     g = nx.DiGraph(m.edges())
     return next(
@@ -120,7 +103,7 @@ def ate_pair(name):
 class TimeVariableElimination(Bench):
     def setup(self):
         self.name = MODEL
-        self.model = model(self.name)
+        self.model = discrete_bn.shared(self.name)
         self.inference = VariableElimination(self.model)
         self.query, self.evidence = query_and_evidence(self.name)
         self.order = elimination_order(self.name)
@@ -146,7 +129,7 @@ class TimeVariableElimination(Bench):
 
 class TimeBeliefPropagation(Bench):
     def setup(self):
-        self.tree = TREE_FIXTURE
+        self.tree = MODEL
         self.inference = copy.deepcopy(calibrated_bp(self.tree))
         self.query, self.evidence = bp_query_and_evidence(self.tree)
 
@@ -193,11 +176,10 @@ class TimeBeliefPropagationWithMessagePassing(Bench):
 class TimeApproxInference(Bench):
     def setup(self):
         self.name = MODEL
-        self.model = model(self.name)
+        self.model = discrete_bn.shared(self.name)
         self.inference = ApproxInference(self.model)
         self.query, self.evidence = query_and_evidence(self.name)
-        self.n_samples = APPROX_SAMPLES
-        self.samples = discrete_data(self.name, self.n_samples)
+        self.samples = discrete_data(self.name, APPROX_SAMPLES)
         self.state_names = {v: self.model.states[v] for v in self.query}
 
     def time_init(self):
@@ -208,19 +190,19 @@ class TimeApproxInference(Bench):
 
     def time_query(self):
         self.inference.query(
-            self.query, n_samples=self.n_samples, evidence=self.evidence, show_progress=False, rng=0
+            self.query, n_samples=APPROX_SAMPLES, evidence=self.evidence, show_progress=False, rng=0
         )
 
     def time_map_query(self):
         self.inference.map_query(
-            self.query, n_samples=self.n_samples, evidence=self.evidence, show_progress=False, rng=0
+            self.query, n_samples=APPROX_SAMPLES, evidence=self.evidence, show_progress=False, rng=0
         )
 
 
 class TimeCausalInference(Bench):
     def setup(self):
         self.name = MODEL
-        self.model = model(self.name)
+        self.model = discrete_bn.shared(self.name)
         self.inference = CausalInference(self.model)
         self.x, self.y = treatment_outcome(self.name)
         self.adjustment = sorted(self.model.get_parents(self.x))
@@ -260,7 +242,7 @@ class TimeCausalInferenceIdentification(Bench):
     def setup(self):
         name = DISCRETE
         self.x, self.y = treatment_outcome(name)
-        self.inference = CausalInference(model(name))
+        self.inference = CausalInference(discrete_bn.shared(name))
 
     def time_identification_method(self):
         self.inference.identification_method(self.x, self.y)
@@ -279,7 +261,7 @@ class TimeCausalInferenceEstimateATE(Bench):
 
 class TimeDBNInference(Bench):
     def setup(self):
-        self.name = DBN_MODEL
+        self.name = DBN_VARS
         self.model = dbn(self.name)
         self.inference = DBNInference(self.model)
         variables = sorted(dbn_spec(self.name)["variables"])

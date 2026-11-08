@@ -1,11 +1,8 @@
 """Benchmarks for ``pgmpy.parameter_estimator``: ``fit`` per estimator, each call on a new estimator, on a shared bare structure.
 
-``DiscreteEM`` marks the first non-root node (``bronc``) latent and drops its column; ``max_iter=EM_ITERATIONS`` fixes the work.
-
 Skipped:
-    constructors, ``_``-prefixed helpers: trivial / private
+    constructors, DiscreteEM.set_params, ``_``-prefixed helpers: trivial / private
     BaseParameterEstimator, DiscreteParameterEstimator, GaussianParameterEstimator: abstract (``fit`` covered via subclasses)
-    DiscreteEM.set_params: trivial
 """
 
 import warnings
@@ -57,16 +54,9 @@ class TimeDiscreteMLE(Bench):
         DiscreteMLE().fit(self.model, self.data)
 
 
-class TimeDiscreteBayesianEstimator(Bench):
-    def setup(self):
-        name = DISCRETE
-        self.model = discrete_structure(name)
-        self.data = discrete_data(name, ROWS)
-
+class TimeDiscreteBayesianEstimator(TimeDiscreteMLE):
     def time_fit(self):
-        DiscreteBayesianEstimator(prior_type="BDeu", equivalent_sample_size=5).fit(
-            self.model, self.data
-        )
+        DiscreteBayesianEstimator(prior_type="BDeu", equivalent_sample_size=5).fit(self.model, self.data)
 
 
 class TimeDiscreteEM(Bench):

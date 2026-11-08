@@ -1,9 +1,5 @@
 """Benchmarks for ``pgmpy.sampling``; ``DiscreteBayesianNetwork.simulate`` is timed in ``models.py``.
 
-``GibbsSampling`` builds a kernel over all assignments (exponential), so it runs on ``asia`` with ``GIBBS_ROWS`` rows (a Python loop per row)
-and a fresh sampler per call (the state is mutated). Rejection sampling is slow with the standard evidence, so it draws ``ROWS // 50``.
-``BayesianModelInference`` is timed on the variable with the largest CPD in ``alarm``. Evidence follows ``inference.query_and_evidence``.
-
 Skipped:
     GibbsSampling.set_start_state: trivial
 """
@@ -31,20 +27,18 @@ class TimeBayesianModelSampling(Bench):
         self.model = discrete_bn(name)
         self.sampler = BayesianModelSampling(self.model)
         self.evidence = [State(var, state) for var, state in query_and_evidence(name)[1].items()]
-        self.n_rows = ROWS
-        self.n_rejection_rows = REJECTION_ROWS
 
     def time_init(self):
         BayesianModelSampling(self.model)
 
     def time_forward_sample(self):
-        self.sampler.forward_sample(self.n_rows, rng=0, show_progress=False)
+        self.sampler.forward_sample(ROWS, rng=0, show_progress=False)
 
     def time_rejection_sample(self):
-        self.sampler.rejection_sample(self.evidence, self.n_rejection_rows, rng=0, show_progress=False)
+        self.sampler.rejection_sample(self.evidence, REJECTION_ROWS, rng=0, show_progress=False)
 
     def time_likelihood_weighted_sample(self):
-        self.sampler.likelihood_weighted_sample(self.evidence, self.n_rows, rng=0, show_progress=False)
+        self.sampler.likelihood_weighted_sample(self.evidence, ROWS, rng=0, show_progress=False)
 
 
 class TimeGibbsSampling(Bench):
@@ -52,16 +46,15 @@ class TimeGibbsSampling(Bench):
         self.model = discrete_bn(DISCRETE)
         self.sampler = GibbsSampling(self.model)
         self.start = [(var, 0) for var in self.model.nodes]
-        self.n_rows = GIBBS_ROWS
 
     def time_init(self):
         GibbsSampling(self.model)
 
     def time_sample(self):
-        self.sampler.sample(start_state=self.start, size=self.n_rows, rng=0)
+        self.sampler.sample(start_state=self.start, size=GIBBS_ROWS, rng=0)
 
     def time_generate_sample(self):
-        for _ in self.sampler.generate_sample(start_state=self.start, size=self.n_rows, rng=0):
+        for _ in self.sampler.generate_sample(start_state=self.start, size=GIBBS_ROWS, rng=0):
             pass
 
 

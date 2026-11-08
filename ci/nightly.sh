@@ -1,21 +1,16 @@
 #!/usr/bin/env bash
 # Benchmark pgmpy dev against the newest dev commit that has results, save the results and publish the dashboard.
-# Usage: ci/nightly.sh <results-store-dir> (a checkout of the results branch)
-# Env: NIGHTLY_PUSH (1 push, 0 local only), BENCH_REGEX (asv -b), SUMMARY_FILE (changed-benchmarks table).
-# Exits with asv's status (1: a >1.5x regression, 2: a benchmark error); results are saved and published either way.
+# Usage: ci/nightly.sh, from the repository root, with results/ a checkout of the results branch.
 set -euo pipefail
 
-store=${1:?usage: ci/nightly.sh <results-store-dir>}
+[ -e results/.git ] || { echo "results/ must be a git checkout of the results branch" >&2; exit 1; }
 NIGHTLY_PUSH=${NIGHTLY_PUSH:-1}
 SUMMARY_FILE=${SUMMARY_FILE:-/dev/null}
 machine=github-ubuntu-latest
 
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONHASHSEED=0 TQDM_DISABLE=1
 
-mkdir -p results
-rsync -a --delete --exclude .git "$store"/ results/
-
-commits=$(python ci/commits.py results "$machine")
+commits=$(python ci/commits.py)
 read -r HEAD PREV <<< "$commits"
 
 if [ "$PREV" = "$HEAD" ]; then
@@ -40,14 +35,13 @@ else
         > "$SUMMARY_FILE" || true
 fi
 
-rsync -a --delete --exclude .git results/ "$store"/
-git -C "$store" add -A
-if ! git -C "$store" diff --cached --quiet; then
-    git -C "$store" commit -m "Nightly results for ${HEAD:0:8}"
+git -C results add -A
+if ! git -C results diff --cached --quiet; then
+    git -C results commit -m "Nightly results for ${HEAD:0:8}"
 fi
 
 if [ "$NIGHTLY_PUSH" = "1" ]; then
-    git -C "$store" push
+    git -C results push
     asv gh-pages --rewrite
 else
     asv publish

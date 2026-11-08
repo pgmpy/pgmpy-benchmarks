@@ -1,8 +1,5 @@
 """Benchmarks for the non-deprecated ``pgmpy.estimators``.
 
-``IVEstimator`` runs on ``random_gaussian_8``'s ``SEM`` with no latents, on the pair ``X_3 -> X_7`` (see ``iv_inputs``).
-``ExhaustiveSearch`` uses the first 3 columns of ``asia`` (the DAG count grows super-exponentially). Each call gets a new estimator.
-
 Skipped:
     MmhcEstimator.__init__ and the other constructors: trivial
 """

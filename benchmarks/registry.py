@@ -1,11 +1,11 @@
-"""Benchmarks for ``pgmpy.registry``. Calls are looped ``CALLS`` times: a single call takes ~1 us, near the clock quantum."""
+"""Benchmarks for ``pgmpy.registry``."""
 
 from benchmarks._bench import Bench
 
 from pgmpy.registry import all_tags, check_tag_is_valid
 
 
-CALLS = 100
+CALLS = 100  # one call takes ~1 us, near the clock resolution
 
 
 class TimeRegistry(Bench):

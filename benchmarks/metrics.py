@@ -1,10 +1,4 @@
-"""Benchmarks for ``pgmpy.metrics``: ``evaluate`` once per metric class, and ``get_metric`` by name and by default.
-
-Supervised metrics compare ``dag_20`` with ``dag_20_perturbed``. Unsupervised metrics evaluate the generating DAG of
-``random_gaussian_8`` against its data, with the ``pearsonr`` CI test and ``bic-g``.
-
-Skipped: none
-"""
+"""Benchmarks for ``pgmpy.metrics``: ``evaluate`` once per metric class, and ``get_metric`` by name and by default."""
 
 import warnings
 from functools import cache
@@ -19,89 +13,54 @@ warnings.filterwarnings("ignore", category=UndefinedMetricWarning, message=r"F-s
 
 
 @cache
-def graphs():
-    return graph("dag_20"), graph("dag_20_perturbed")
-
-
-@cache
 def unsupervised_inputs():
     return gaussian_data(GAUSSIAN, ROWS), gaussian_bn(GAUSSIAN)
 
 
-class SupervisedMetric(Bench):
-    metric = None
-
+class _Supervised(Bench):
     def setup(self):
-        self.true_graph, self.est_graph = graphs()
+        self.true_graph, self.est_graph = graph.shared("dag"), graph.shared("perturbed")
         self.instance = self.metric()
 
-    def evaluate(self):
-        return self.instance.evaluate(true_causal_graph=self.true_graph, est_causal_graph=self.est_graph)
+    def time_evaluate(self):
+        self.instance.evaluate(true_causal_graph=self.true_graph, est_causal_graph=self.est_graph)
 
 
-class TimeAdjacencyConfusionMatrix(SupervisedMetric):
+class TimeAdjacencyConfusionMatrix(_Supervised):
     metric = metrics.AdjacencyConfusionMatrix
 
-    def time_evaluate(self):
-        self.evaluate()
 
-
-class TimeOrientationConfusionMatrix(SupervisedMetric):
+class TimeOrientationConfusionMatrix(_Supervised):
     metric = metrics.OrientationConfusionMatrix
 
-    def time_evaluate(self):
-        self.evaluate()
 
-
-class TimeSHD(SupervisedMetric):
+class TimeSHD(_Supervised):
     metric = metrics.SHD
 
-    def time_evaluate(self):
-        self.evaluate()
 
-
-class UnsupervisedMetric(Bench):
-    def make(self):
-        raise NotImplementedError
-
+class _Unsupervised(Bench):
     def setup(self):
         self.data, self.model = unsupervised_inputs()
-        self.instance = self.make()
-
-    def evaluate(self):
-        return self.instance.evaluate(X=self.data, causal_graph=self.model)
-
-
-class TimeCorrelationScore(UnsupervisedMetric):
-    def make(self):
-        return metrics.CorrelationScore(ci_test="pearsonr")
+        self.instance = self.metric(**self.kwargs)
 
     def time_evaluate(self):
-        self.evaluate()
+        self.instance.evaluate(X=self.data, causal_graph=self.model)
 
 
-class TimeImpliedCIs(UnsupervisedMetric):
-    def make(self):
-        return metrics.ImpliedCIs(ci_test="pearsonr", show_progress=False)
-
-    def time_evaluate(self):
-        self.evaluate()
+class TimeCorrelationScore(_Unsupervised):
+    metric, kwargs = metrics.CorrelationScore, {"ci_test": "pearsonr"}
 
 
-class TimeFisherC(UnsupervisedMetric):
-    def make(self):
-        return metrics.FisherC(ci_test="pearsonr", show_progress=False)
-
-    def time_evaluate(self):
-        self.evaluate()
+class TimeImpliedCIs(_Unsupervised):
+    metric, kwargs = metrics.ImpliedCIs, {"ci_test": "pearsonr", "show_progress": False}
 
 
-class TimeStructureScore(UnsupervisedMetric):
-    def make(self):
-        return metrics.StructureScore(scoring_method="bic-g")
+class TimeFisherC(_Unsupervised):
+    metric, kwargs = metrics.FisherC, {"ci_test": "pearsonr", "show_progress": False}
 
-    def time_evaluate(self):
-        self.evaluate()
+
+class TimeStructureScore(_Unsupervised):
+    metric, kwargs = metrics.StructureScore, {"scoring_method": "bic-g"}
 
 
 class TimeGetMetric(Bench):

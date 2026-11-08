@@ -1,18 +1,10 @@
 """Benchmarks for ``pgmpy.models``. Methods a Bayesian network inherits from ``DAG`` are timed in ``base.py``.
 
-Whole-network operations run on reduced inputs: ``get_partition_function`` on a ``PRODUCT_CELLS`` prefix of the factors,
-``get_local_independencies`` on ``INDEPENDENCE_NODES`` nodes, ``get_state_probability`` with all but ``FREE_VARIABLES`` nodes
-fixed, ``predict``/``predict_probability`` on ``PREDICT_ROWS``/``PROBABILITY_ROWS`` rows with ``MISSING_COLUMNS`` columns dropped,
-``is_imap`` on an ``IMAP_VARS`` chain. Junction-tree conversions need a connected graph. ``NaiveBayes``: first column is the class.
-Mutating methods work on a model built fresh by ``setup``. ``SEMEstimator``, ``FunctionalBayesianNetwork`` and ``FunctionalCPD``
-are out of scope.
-
 Skipped:
-    DiscreteBayesianNetwork.get_factorized_product: trivial (empty stub)
+    DiscreteBayesianNetwork.get_factorized_product, SEM.fit: trivial (empty stub)
     DiscreteBayesianNetwork.states, DiscreteMarkovNetwork.states, JunctionTree.states, ClusterGraph.clique_beliefs: trivial
     LinearGaussianBayesianNetwork.get_cardinality, .is_imap, .to_markov_model: unsupported (raise)
     MarkovChain.is_stationarity: infeasible (draws a 10000-row sample per state: 32 s for 20 x 5)
-    SEM.fit: trivial (empty stub)
 """
 
 import networkx as nx
@@ -24,6 +16,7 @@ from benchmarks._fixtures import (
     discrete_bn,
     discrete_data,
     factor_graph,
+    factor_graph_from,
     factors,
     first_states,
     gaussian_bn,
@@ -55,8 +48,6 @@ from pgmpy.models import (
     SEMGraph,
 )
 
-TREE_FIXTURE = "jt_alarm"
-
 INDEPENDENCE_NODES = 5
 FREE_VARIABLES = 3
 MISSING_COLUMNS = 2
@@ -66,7 +57,7 @@ IMAP_VARS = 4
 RANDOM_BN = (20, 0.2, 3)
 
 LINEAR_GAUSSIAN_RANDOM = (20, 0.2)
-DBN_MODEL = "dbn_5"
+DBN_VARS = 5
 DBN_SIMULATE_SAMPLES = 500
 NEW_NODES = 10
 CHAIN_SIZE = (3, 3)
@@ -74,7 +65,6 @@ SEM_ERR_CORR = 1
 
 
 def prefix_factors(name, max_cells):
-    """The leading factors (sorted by scope) of a discrete model whose joint state space is small."""
     return product_prefix(factors(name), max_cells)
 
 
@@ -89,7 +79,6 @@ def prefix_markov_network(name, max_cells):
 
 
 def non_edge(g):
-    """First pair of nodes (sorted) that are not adjacent."""
     nodes = sorted(g.nodes)
     for a in nodes:
         for b in nodes:
@@ -98,9 +87,7 @@ def non_edge(g):
 
 
 def dag_non_edge(model):
-    """First and last node in topological order: an edge between them can never form a cycle."""
-    order = list(nx.topological_sort(model))
-    assert not model.has_edge(order[0], order[-1])
+    order = topological(model)
     return order[0], order[-1]
 
 
@@ -201,20 +188,15 @@ class TimeDiscreteBayesianNetworkPredict(Bench):
 class TimeDiscreteBayesianNetworkSimulate(Bench):
     def setup(self):
         self.model = discrete_bn(MODEL)
-        self.n_samples = ROWS
 
     def time_simulate(self):
-        self.model.simulate(self.n_samples, rng=0, show_progress=False)
+        self.model.simulate(ROWS, rng=0, show_progress=False)
 
 
 class TimeDiscreteBayesianNetworkRandom(Bench):
-    def setup(self):
-        self.n_nodes, self.edge_prob, self.n_states = RANDOM_BN
-
     def time_get_random(self):
-        DiscreteBayesianNetwork.get_random(
-            self.n_nodes, edge_prob=self.edge_prob, n_states=self.n_states, rng=0
-        )
+        n_nodes, edge_prob, n_states = RANDOM_BN
+        DiscreteBayesianNetwork.get_random(n_nodes, edge_prob=edge_prob, n_states=n_states, rng=0)
 
 
 class TimeDiscreteBayesianNetworkIsImap(Bench):
@@ -362,18 +344,13 @@ class TimeFactorGraphJunctionTree(Bench):
 class TimeFactorGraphPartition(Bench):
     def setup(self):
         fs = prefix_factors(MODEL, PRODUCT_CELLS)
-        self.model = FactorGraph()
-        self.model.add_nodes_from(sorted({v for f in fs for v in f.variables}))
-        self.model.add_nodes_from(fs)
-        self.model.add_factors(*fs)
-        self.model.add_edges_from([(v, f) for f in fs for v in f.variables])
+        self.model = factor_graph_from(sorted({v for f in fs for v in f.variables}), fs)
 
     def time_get_partition_function(self):
         self.model.get_partition_function()
 
 
 def cluster_graph(name, max_cells=None):
-    """ClusterGraph with the cliques, edges and factors of a junction tree fixture."""
     jt = junction_tree(name)
     factor_of = {frozenset(f.scope()): f for f in jt.get_factors()}
     cliques = list(jt.nodes)
@@ -397,9 +374,9 @@ def cluster_graph(name, max_cells=None):
 
 class TimeJunctionTree(Bench):
     def setup(self):
-        self.model = junction_tree(TREE_FIXTURE)
+        self.model = junction_tree(MODEL)
         self.edge = list(self.model.edges)[-1]
-        self.cut = junction_tree(TREE_FIXTURE)
+        self.cut = junction_tree(MODEL)
         self.cut.remove_edge(*self.edge)
 
     def time_add_edge(self):
@@ -414,8 +391,7 @@ class TimeJunctionTree(Bench):
 
 class TimeClusterGraph(Bench):
     def setup(self):
-        name = TREE_FIXTURE
-        self.model = cluster_graph(name)
+        self.model = cluster_graph(MODEL)
         self.cliques = list(self.model.nodes)
         self.first = self.cliques[0]
         self.some_factors = self.model.get_factors()[:3]
@@ -460,7 +436,7 @@ class TimeClusterGraph(Bench):
 
 class TimeClusterGraphPartition(Bench):
     def setup(self):
-        self.model = cluster_graph(TREE_FIXTURE, PRODUCT_CELLS)
+        self.model = cluster_graph(MODEL, PRODUCT_CELLS)
 
     def time_get_partition_function(self):
         self.model.get_partition_function()
@@ -543,7 +519,6 @@ def dbn_edges(model):
 
 
 def missing_inter_edge(model):
-    """First inter-slice edge ``(Vi, 0) -> (Vj, 1)`` (variables sorted) that ``model`` lacks."""
     variables = sorted({n.node for n in model.nodes})
     present = set(dbn_edges(model))
     for a in variables:
@@ -554,7 +529,7 @@ def missing_inter_edge(model):
 
 class TimeDynamicBayesianNetwork(Bench):
     def setup(self):
-        self.model = dbn(DBN_MODEL)
+        self.model = dbn(DBN_VARS)
         self.first = ("V0", 0)
         self.last = ("V0", 1)
         self.observed = [("V1", 0), ("V2", 0)]
@@ -605,7 +580,7 @@ class TimeDynamicBayesianNetwork(Bench):
 
 class TimeDynamicBayesianNetworkBuild(Bench):
     def setup(self):
-        model = dbn(DBN_MODEL)
+        model = dbn(DBN_VARS)
         self.cpds = list(model.cpds)
         self.edges = dbn_edges(model)
         self.new_edge = missing_inter_edge(model)
@@ -631,7 +606,7 @@ class TimeDynamicBayesianNetworkBuild(Bench):
 
 class TimeDynamicBayesianNetworkInitialState(Bench):
     def setup(self):
-        model = dbn(DBN_MODEL)
+        model = dbn(DBN_VARS)
         given = [c for c in model.cpds if c.variable[1] == 0 or any(v[1] == 0 for v in c.variables[1:])]
         self.model = bare_dbn(model)
         self.model.add_cpds(*given)
@@ -642,9 +617,8 @@ class TimeDynamicBayesianNetworkInitialState(Bench):
 
 class TimeDynamicBayesianNetworkFit(Bench):
     def setup(self):
-        name = DBN_MODEL
-        self.model = bare_dbn(dbn(name))
-        self.data = dbn_data(name, ROWS)
+        self.model = bare_dbn(dbn(DBN_VARS))
+        self.data = dbn_data(DBN_VARS, ROWS)
 
     def time_fit(self):
         self.model.fit(self.data)

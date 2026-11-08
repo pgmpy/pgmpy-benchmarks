@@ -1,14 +1,11 @@
 """Benchmarks for ``pgmpy.causal_discovery``: ``fit`` per concrete class, ``score`` once on a fitted ``HillClimbSearch``.
 
-``n_jobs=1``, ``show_progress=False``, ``rng=0`` everywhere they are accepted. ANM uses 300 rows (GP fit is O(n^2)); SP is capped at
-``SP_MAX_ITER`` of the 40320 permutations; ANM/IGCI take the endpoints of the first sorted edge of the true network.
-
 Skipped:
     LLMPairwise, ExpertInLoop: llm
 """
 
 import warnings
-from functools import cache
+from functools import cache, partial
 from itertools import combinations
 
 import networkx as nx
@@ -38,9 +35,9 @@ warnings.filterwarnings(
     message=r"\d+ pair\(s\) of variables passed the threshold but were left out of the consensus graph",
 )
 
-PDAG = "pdag_20"
+PDAG = "pdag"
 
-ANM_ROWS = 300
+ANM_ROWS = 300  # the GP fit is O(n^2)
 SP_MAX_ITER = 2_000
 N_BOOTSTRAPS = 10
 
@@ -59,36 +56,28 @@ def gaussian_pair(rows):
     return gaussian_data(GAUSSIAN, rows)[list(first_edge)]
 
 
-class TimePC(Bench):
+class _Fit(Bench):
     def setup(self):
-        self.data = discrete()
+        self.data = self.load()
 
     def time_fit(self):
-        PC(n_jobs=1, show_progress=False).fit(self.data)
+        self.make().fit(self.data)
 
 
-class TimePCGaussian(Bench):
-    def setup(self):
-        self.data = gaussian()
-
-    def time_fit(self):
-        PC(n_jobs=1, show_progress=False).fit(self.data)
+class TimePC(_Fit):
+    load, make = staticmethod(discrete), staticmethod(partial(PC, n_jobs=1, show_progress=False))
 
 
-class TimeGES(Bench):
-    def setup(self):
-        self.data = discrete()
-
-    def time_fit(self):
-        GES().fit(self.data)
+class TimePCGaussian(_Fit):
+    load, make = staticmethod(gaussian), staticmethod(partial(PC, n_jobs=1, show_progress=False))
 
 
-class TimeGESGaussian(Bench):
-    def setup(self):
-        self.data = gaussian()
+class TimeGES(_Fit):
+    load, make = staticmethod(discrete), GES
 
-    def time_fit(self):
-        GES().fit(self.data)
+
+class TimeGESGaussian(_Fit):
+    load, make = staticmethod(gaussian), GES
 
 
 class TimeGESOperations(Bench):
@@ -116,12 +105,8 @@ class TimeGESOperations(Bench):
         self.ges.turn(v, u, set(), self.model)
 
 
-class TimeHillClimbSearch(Bench):
-    def setup(self):
-        self.data = discrete()
-
-    def time_fit(self):
-        HillClimbSearch(show_progress=False).fit(self.data)
+class TimeHillClimbSearch(_Fit):
+    load, make = staticmethod(discrete), staticmethod(partial(HillClimbSearch, show_progress=False))
 
 
 @cache
@@ -142,12 +127,8 @@ class TimeHillClimbSearchScore(Bench):
         self.estimator.score(true_graph=self.true_graph)
 
 
-class TimeChowLiu(Bench):
-    def setup(self):
-        self.data = discrete()
-
-    def time_fit(self):
-        ChowLiu(n_jobs=1, show_progress=False).fit(self.data)
+class TimeChowLiu(_Fit):
+    load, make = staticmethod(discrete), staticmethod(partial(ChowLiu, n_jobs=1, show_progress=False))
 
 
 class TimeTAN(Bench):
@@ -159,52 +140,28 @@ class TimeTAN(Bench):
         TAN(class_node=self.class_node, n_jobs=1, show_progress=False).fit(self.data)
 
 
-class TimeSP(Bench):
-    def setup(self):
-        self.data = discrete()
-
-    def time_fit(self):
-        SP(max_iter=SP_MAX_ITER, rng=0, show_progress=False).fit(self.data)
+class TimeSP(_Fit):
+    load, make = staticmethod(discrete), staticmethod(partial(SP, max_iter=SP_MAX_ITER, rng=0, show_progress=False))
 
 
-class TimeANM(Bench):
-    def setup(self):
-        self.data = gaussian_pair(ANM_ROWS)
-
-    def time_fit(self):
-        ANM().fit(self.data)
+class TimeANM(_Fit):
+    load, make = staticmethod(partial(gaussian_pair, ANM_ROWS)), ANM
 
 
-class TimeIGCI(Bench):
-    def setup(self):
-        self.data = gaussian_pair(ROWS)
-
-    def time_fit(self):
-        IGCI().fit(self.data)
+class TimeIGCI(_Fit):
+    load, make = staticmethod(partial(gaussian_pair, ROWS)), IGCI
 
 
-class TimeR2Sort(Bench):
-    def setup(self):
-        self.data = gaussian()
-
-    def time_fit(self):
-        R2Sort().fit(self.data)
+class TimeR2Sort(_Fit):
+    load, make = staticmethod(gaussian), R2Sort
 
 
-class TimeVarSort(Bench):
-    def setup(self):
-        self.data = gaussian()
-
-    def time_fit(self):
-        VarSort().fit(self.data)
+class TimeVarSort(_Fit):
+    load, make = staticmethod(gaussian), VarSort
 
 
-class TimeTOPIC(Bench):
-    def setup(self):
-        self.data = gaussian()
-
-    def time_fit(self):
-        TOPIC(show_progress=False).fit(self.data)
+class TimeTOPIC(_Fit):
+    load, make = staticmethod(gaussian), staticmethod(partial(TOPIC, show_progress=False))
 
 
 def bootstrap_estimator():
@@ -217,9 +174,8 @@ def bootstrap_estimator():
     )
 
 
-class TimeBootstrapEstimator(Bench):
-    def setup(self):
-        self.data = discrete()
+class TimeBootstrapEstimator(_Fit):
+    load = staticmethod(discrete)
 
     def time_fit(self):
         bootstrap_estimator().fit(self.data)

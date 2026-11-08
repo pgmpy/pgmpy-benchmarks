@@ -1,21 +1,15 @@
 """Benchmarks for ``pgmpy.readwrite``, on text from pgmpy's writers (PomdpX: ``benchmarks/data/rocksample.pomdpx``).
 
-``Time<Format>Reader.time_read``: construct from ``string=`` and ``read()``; ``Time<Format>ReaderGetters``: the parsing ``get_*`` methods.
-``Time<Format>Writer``: ``time_str`` and ``time_write`` (into a temp dir). Inherited ``BaseWriter.write`` is timed once, on BIFWriter.
-UAI files use ``round_values=4`` (the reader cannot parse "1e-05"); ``XDSLWriter`` output is random but its work is not.
-
 Skipped:
     BaseReader.get_model, write_bif / write_uai / write_net / write_xmlbif / write_xbn / write_xdsl: deprecated
-    XMLBeliefNetwork: alias of the XBN classes
-    XBNReader.get_analysisnotebook_values, .get_bnmodel_name, XMLBIFReader.get_edges, XDSLReader.get_edges,
-    NETReader.get_edges, UAIReader.get_variables, PomdpXReader.get_description, .get_discount: trivial
-    PomdpXReader.get_parameter_dd: no decision-diagram input
-    writers' get_* / set_* methods: timed through the constructor
-    indent, BIF_templates, NET_templates, net_cpd, PomdpXWriter.add_conditions, .add_parameter_dd, .__str__: internal
+    XBNReader.get_analysisnotebook_values, .get_bnmodel_name, XMLBIFReader / XDSLReader / NETReader.get_edges,
+    UAIReader.get_variables, PomdpXReader.get_description, .get_discount: trivial
+    PomdpXReader.get_parameter_dd: no decision-diagram input; XMLBeliefNetwork: alias of the XBN classes
+    writers' get_* / set_* (timed through the constructor), indent, BIF_templates, NET_templates, net_cpd,
+    PomdpXWriter.add_conditions, .add_parameter_dd, .__str__: internal
 """
 
 import tempfile
-from functools import cache
 from pathlib import Path
 
 from benchmarks._fixtures import discrete_bn, gaussian_bn, pomdpx_model_data, readwrite_text
@@ -40,69 +34,49 @@ from pgmpy.readwrite import (
     XMLBIFWriter,
 )
 
-FILE = {
-    "bif": "asia",
-    "xmlbif": "asia",
-    "xbn": "asia",
-    "xdsl": "asia",
-    "uai": "asia",
-    "net": "asia",
-    "json": "random_gaussian_8",
-    "pomdpx": "rocksample",
-}
-
-
-@cache
-def _discrete():
-    return discrete_bn(DISCRETE)
-
-
-@cache
-def _gaussian():
-    return gaussian_bn(GAUSSIAN)
+NAME = {"json": GAUSSIAN, "pomdpx": "rocksample"}
 
 
 class ReaderBench(Bench):
-    """A reader class's input: the text of its file."""
-
-    fmt = None
-
     def setup(self):
-        self.text = readwrite_text(self.fmt, FILE[self.fmt])
+        self.text = readwrite_text(self.fmt, NAME.get(self.fmt, DISCRETE))
 
 
 class GettersBench(ReaderBench):
-    """A reader constructed once per call, for the timing of its ``get_*`` methods."""
-
-    reader_class = None
-
     def setup(self):
         super().setup()
         self.reader = self.reader_class(string=self.text)
 
 
-class WriterBench(Bench):
-    """A writer class's input: the model and a directory to write into."""
+class _Read(ReaderBench):
+    def time_read(self):
+        self.reader_class(string=self.text).read()
 
+
+class _Writer(Bench):
     def setup(self):
-        self.model = _discrete()
+        self.model = discrete_bn.shared(DISCRETE)
         self.dir = tempfile.TemporaryDirectory()
         self.path = Path(self.dir.name) / "model"
 
     def teardown(self):
         self.dir.cleanup()
 
+    def time_str(self):
+        str(self.writer(self.model))
 
-class TimeBIFReader(ReaderBench):
-    fmt = "bif"
 
-    def time_read(self):
-        BIFReader(string=self.text).read()
+class _FileWriter(_Writer):
+    def time_write(self):
+        self.writer(self.model).write(self.path)
+
+
+class TimeBIFReader(_Read):
+    fmt, reader_class = "bif", BIFReader
 
 
 class TimeBIFReaderGetters(GettersBench):
-    fmt = "bif"
-    reader_class = BIFReader
+    fmt, reader_class = "bif", BIFReader
 
     def time_get_variable_grammar(self):
         self.reader.get_variable_grammar()
@@ -111,24 +85,16 @@ class TimeBIFReaderGetters(GettersBench):
         self.reader.get_probability_grammar()
 
 
-class TimeBIFWriter(WriterBench):
-    def time_str(self):
-        str(BIFWriter(self.model))
-
-    def time_write(self):
-        BIFWriter(self.model).write(self.path)
+class TimeBIFWriter(_FileWriter):
+    writer = BIFWriter
 
 
-class TimeXMLBIFReader(ReaderBench):
-    fmt = "xmlbif"
-
-    def time_read(self):
-        XMLBIFReader(string=self.text).read()
+class TimeXMLBIFReader(_Read):
+    fmt, reader_class = "xmlbif", XMLBIFReader
 
 
 class TimeXMLBIFReaderGetters(GettersBench):
-    fmt = "xmlbif"
-    reader_class = XMLBIFReader
+    fmt, reader_class = "xmlbif", XMLBIFReader
 
     def time_get_variables(self):
         self.reader.get_variables()
@@ -146,24 +112,16 @@ class TimeXMLBIFReaderGetters(GettersBench):
         self.reader.get_property()
 
 
-class TimeXMLBIFWriter(WriterBench):
-    def time_str(self):
-        str(XMLBIFWriter(self.model))
-
-    def time_write(self):
-        XMLBIFWriter(self.model).write(self.path)
+class TimeXMLBIFWriter(_FileWriter):
+    writer = XMLBIFWriter
 
 
-class TimeXBNReader(ReaderBench):
-    fmt = "xbn"
-
-    def time_read(self):
-        XBNReader(string=self.text).read()
+class TimeXBNReader(_Read):
+    fmt, reader_class = "xbn", XBNReader
 
 
 class TimeXBNReaderGetters(GettersBench):
-    fmt = "xbn"
-    reader_class = XBNReader
+    fmt, reader_class = "xbn", XBNReader
 
     def time_get_static_properties(self):
         self.reader.get_static_properties()
@@ -178,24 +136,16 @@ class TimeXBNReaderGetters(GettersBench):
         self.reader.get_distributions()
 
 
-class TimeXBNWriter(WriterBench):
-    def time_str(self):
-        str(XBNWriter(self.model))
-
-    def time_write(self):
-        XBNWriter(self.model).write(self.path)
+class TimeXBNWriter(_FileWriter):
+    writer = XBNWriter
 
 
-class TimeXDSLReader(ReaderBench):
-    fmt = "xdsl"
-
-    def time_read(self):
-        XDSLReader(string=self.text).read()
+class TimeXDSLReader(_Read):
+    fmt, reader_class = "xdsl", XDSLReader
 
 
 class TimeXDSLReaderGetters(GettersBench):
-    fmt = "xdsl"
-    reader_class = XDSLReader
+    fmt, reader_class = "xdsl", XDSLReader
 
     def time_get_variables(self):
         self.reader.get_variables()
@@ -210,24 +160,16 @@ class TimeXDSLReaderGetters(GettersBench):
         self.reader.get_values()
 
 
-class TimeXDSLWriter(WriterBench):
-    def time_str(self):
-        str(XDSLWriter(self.model))
-
-    def time_write(self):
-        XDSLWriter(self.model).write(self.path)
+class TimeXDSLWriter(_FileWriter):
+    writer = XDSLWriter
 
 
-class TimeUAIReader(ReaderBench):
-    fmt = "uai"
-
-    def time_read(self):
-        UAIReader(string=self.text).read()
+class TimeUAIReader(_Read):
+    fmt, reader_class = "uai", UAIReader
 
 
 class TimeUAIReaderGetters(GettersBench):
-    fmt = "uai"
-    reader_class = UAIReader
+    fmt, reader_class = "uai", UAIReader
 
     def time_get_grammar(self):
         self.reader.get_grammar()
@@ -245,21 +187,16 @@ class TimeUAIReaderGetters(GettersBench):
         self.reader.get_tables()
 
 
-class TimeUAIWriter(WriterBench):
-    def time_str(self):
-        str(UAIWriter(self.model))
+class TimeUAIWriter(_Writer):
+    writer = UAIWriter
 
 
-class TimeNETReader(ReaderBench):
-    fmt = "net"
-
-    def time_read(self):
-        NETReader(string=self.text).read()
+class TimeNETReader(_Read):
+    fmt, reader_class = "net", NETReader
 
 
 class TimeNETReaderGetters(GettersBench):
-    fmt = "net"
-    reader_class = NETReader
+    fmt, reader_class = "net", NETReader
 
     def time_get_variable_grammar(self):
         self.reader.get_variable_grammar()
@@ -286,21 +223,17 @@ class TimeNETReaderGetters(GettersBench):
         self.reader.get_values()
 
 
-class TimeNETWriter(WriterBench):
-    def time_str(self):
-        str(NETWriter(self.model))
+class TimeNETWriter(_Writer):
+    writer = NETWriter
 
 
-class TimeLGBNJSONReader(ReaderBench):
-    fmt = "json"
-
-    def time_read(self):
-        LGBNJSONReader(string=self.text).read()
+class TimeLGBNJSONReader(_Read):
+    fmt, reader_class = "json", LGBNJSONReader
 
 
 class TimeLGBNJSONWriter(Bench):
     def setup(self):
-        self.model = _gaussian()
+        self.model = gaussian_bn.shared(GAUSSIAN)
 
     def time_str(self):
         str(LGBNJSONWriter(self.model))
@@ -314,8 +247,7 @@ class TimePomdpXReader(ReaderBench):
 
 
 class TimePomdpXReaderGetters(GettersBench):
-    fmt = "pomdpx"
-    reader_class = PomdpXReader
+    fmt, reader_class = "pomdpx", PomdpXReader
 
     def setup(self):
         super().setup()
@@ -346,7 +278,7 @@ class TimePomdpXReaderGetters(GettersBench):
 
 class TimePomdpXWriter(Bench):
     def setup(self):
-        self.data = pomdpx_model_data(FILE["pomdpx"])  # fresh: the writer is given the dict, not a copy
+        self.data = pomdpx_model_data("rocksample")  # fresh: the writer is given the dict, not a copy
 
     def time_init(self):
         PomdpXWriter(model_data=self.data)

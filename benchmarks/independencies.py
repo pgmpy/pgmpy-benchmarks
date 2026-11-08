@@ -1,19 +1,8 @@
-"""Benchmarks for ``pgmpy.independencies``.
-
-Inputs are ``_fixtures.independencies``: 5 seeded random assertions over 7 variables.
-
-``closure`` is exponential in the number of variables and assertions (semi-graphoid axioms applied until
-no new assertion appears), and ``entails``, ``is_equivalent`` and ``reduce`` are built on it. The
-fixture's closure has about 130 assertions and takes 0.05 s (``PYTHONHASHSEED=0``;
-``is_equivalent`` 0.09 s, two closures against an equal copy; ``entails`` is checked against the
-first two assertions).
-
-Read-only methods share one ``Independencies`` (memoized). ``add_assertions`` mutates, so it
-gets a fresh object on every call. ``contains`` looks up the last assertion of the list.
+"""Benchmarks for ``pgmpy.independencies``. Inputs are ``_fixtures.independencies``: ``closure`` is exponential, so the
+fixture is 5 assertions over 7 variables.
 
 Skipped:
-    ``Independencies.get_assertions`` and ``IndependenceAssertion.get_assertion`` (trivial: return a
-    stored attribute), ``Independencies.get_factorized_product`` (stub: its body is ``pass``).
+    Independencies.get_assertions, IndependenceAssertion.get_assertion, Independencies.get_factorized_product (stub): trivial
 """
 
 from functools import cache
@@ -23,13 +12,11 @@ from benchmarks._bench import Bench
 
 from pgmpy.independencies import IndependenceAssertion, Independencies
 
-FIXTURE = "indep_small"
-
 
 @cache
 def shared():
     """The ``Independencies`` and its last assertion; only read by the benchmarks."""
-    ind = independencies(FIXTURE)
+    ind = independencies()
     return ind, ind.get_assertions()[-1]
 
 
@@ -41,7 +28,7 @@ class TimeIndependencies(Bench):
         Independencies(*[a.get_assertion() for a in self.ind.get_assertions()])
 
     def time_add_assertions(self):
-        independencies(FIXTURE).add_assertions(*[a.get_assertion() for a in self.ind.get_assertions()[:2]])
+        independencies().add_assertions(*[a.get_assertion() for a in self.ind.get_assertions()[:2]])
 
     def time_contains(self):
         self.last in self.ind
@@ -59,7 +46,7 @@ class TimeIndependencies(Bench):
         self.ind.entails(Independencies(*self.ind.get_assertions()[:2]))
 
     def time_is_equivalent(self):
-        self.ind.is_equivalent(independencies(FIXTURE))
+        self.ind.is_equivalent(independencies())
 
     def time_reduce(self):
         self.ind.reduce()

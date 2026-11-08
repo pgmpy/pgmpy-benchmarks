@@ -1,8 +1,5 @@
 """Benchmarks for ``pgmpy.prediction``: ``fit`` (fresh regressor) and ``predict`` (fitted one) per regressor.
 
-Data and pair ``X_3 -> X_7`` come from ``estimators.iv_inputs``. Adjustment regressors use the parents of ``X``; the IV regressor
-uses ``get_ivs(X, Y)``. ``DoubleMLRegressor`` gets ``rng=0``.
-
 Skipped:
     NaiveAdjustmentRegressor.get_feature_names_out, DoubleMLRegressor.set_params, constructors: trivial
 """
@@ -47,8 +44,7 @@ def inputs(kind):
 
 
 @cache
-def fitted(regressor):
-    kind = "iv" if regressor is NaiveIVRegressor else "adjustment"
+def fitted(regressor, kind):
     dag, features, outcome = inputs(kind)
     return make(regressor, dag).fit(features, outcome)
 
@@ -57,42 +53,28 @@ def make(regressor, dag):
     return regressor(dag, rng=0) if regressor is DoubleMLRegressor else regressor(dag)
 
 
-class RegressorBench(Bench):
-    regressor = None
+class _Regressor(Bench):
     kind = "adjustment"
 
     def setup(self):
         dag, self.features, self.outcome = inputs(self.kind)
         self.estimator = make(self.regressor, dag)
-        self.fitted = fitted(self.regressor)
+        self.fitted = fitted(self.regressor, self.kind)
+
+    def time_fit(self):
+        self.estimator.fit(self.features, self.outcome)
+
+    def time_predict(self):
+        self.fitted.predict(self.features)
 
 
-class TimeNaiveAdjustmentRegressor(RegressorBench):
+class TimeNaiveAdjustmentRegressor(_Regressor):
     regressor = NaiveAdjustmentRegressor
 
-    def time_fit(self):
-        self.estimator.fit(self.features, self.outcome)
 
-    def time_predict(self):
-        self.fitted.predict(self.features)
+class TimeNaiveIVRegressor(_Regressor):
+    regressor, kind = NaiveIVRegressor, "iv"
 
 
-class TimeNaiveIVRegressor(RegressorBench):
-    regressor = NaiveIVRegressor
-    kind = "iv"
-
-    def time_fit(self):
-        self.estimator.fit(self.features, self.outcome)
-
-    def time_predict(self):
-        self.fitted.predict(self.features)
-
-
-class TimeDoubleMLRegressor(RegressorBench):
+class TimeDoubleMLRegressor(_Regressor):
     regressor = DoubleMLRegressor
-
-    def time_fit(self):
-        self.estimator.fit(self.features, self.outcome)
-
-    def time_predict(self):
-        self.fitted.predict(self.features)

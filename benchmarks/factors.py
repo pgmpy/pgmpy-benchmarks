@@ -1,13 +1,9 @@
 """Benchmarks for ``pgmpy.factors``, including the module-level ``factor_*`` functions.
 
-Products and partition-style operations run on a prefix of the ``alarm`` CPD factors, capped at ``PRODUCT_CELLS`` joint cells
-(``SUM_PRODUCT_FACTORS`` factors for ``factor_sum_product``); ``JointProbabilityDistribution.get_independencies`` and
-``minimal_imap`` use a ``JOINT_VARS``-variable chain. Mutating methods get fresh objects from ``setup``.
 ``TabularCPD.is_valid_cpd`` is timed on the CPD because it calls ``to_factor``, which plain factors lack.
 
 Skipped:
-    DiscreteFactor.scope, TabularCPD.get_evidence, FactorDict.get_factors: trivial
-    JointProbabilityDistribution.pmap: trivial (empty stub)
+    DiscreteFactor.scope, TabularCPD.get_evidence, FactorDict.get_factors, JointProbabilityDistribution.pmap (empty stub): trivial
 """
 
 import numpy as np

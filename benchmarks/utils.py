@@ -1,4 +1,4 @@
-"""Benchmarks for ``pgmpy.utils``: one ``time_<function>`` per public function, on ``asia``/``random_gaussian_8`` data.
+"""Benchmarks for ``pgmpy.utils``: one ``time_<function>`` per public function.
 
 Skipped:
     optimize, pinverse: torch
@@ -46,8 +46,7 @@ def timeseries_frame():
 @cache
 def pmfs():
     rng = np.random.default_rng(0)
-    # multiples of 1/16 sum to exactly 1
-    table = rng.multinomial(16, np.ones(STATES) / STATES, size=4) / 16
+    table = rng.multinomial(16, np.ones(STATES) / STATES, size=4) / 16  # multiples of 1/16 sum to exactly 1
     return table[0], table[np.arange(ROWS) % 4]
 
 
