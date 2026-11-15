@@ -74,7 +74,8 @@ different inputs.
 ## Nightly workflow
 
 The workflow starts each day at 03:00 UTC. It runs `asv run NEW`. This command measures each first-parent `dev` commit
-that is newer than the newest commit with results. If `dev` has no new commits, the workflow stops. Then the workflow
+that is newer than the newest commit with results. The first run, with no results, measures only the newest `dev`
+commit. If `dev` has no new commits, the workflow stops. Then the workflow
 saves the results on the `results` branch and updates the dashboard on `gh-pages`. It also does this when a benchmark
 has an error.
 

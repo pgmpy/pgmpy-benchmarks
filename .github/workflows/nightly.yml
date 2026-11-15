@@ -54,6 +54,7 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       # `asv run NEW` exits 1 when no dev commit is newer than the newest one with results, so stop before it in that case.
+      # With no results yet, NEW means all of dev's history, so the first run measures only the newest commit.
       - name: Run benchmarks
         id: bench
         run: |
@@ -62,8 +63,10 @@ jobs:
             echo "dev ($head) already has results; nothing to benchmark"
             exit 0
           fi
+          range=NEW
+          compgen -G "results/$MACHINE/*-*.json" > /dev/null || range="$head^!"
           asv machine --yes --machine "$MACHINE"
-          asv run --show-stderr --machine "$MACHINE" NEW
+          asv run --show-stderr --machine "$MACHINE" "$range"
 
       # Also when a benchmark errored (asv exits 2), so the dashboard shows the error.
       - name: Save the results, publish the dashboard
