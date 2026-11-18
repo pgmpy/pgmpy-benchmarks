@@ -40,23 +40,44 @@ asv continuous --interleave-rounds --factor 1.5 --split <base-sha> <head-sha>
 
 ## Add a benchmark
 
-1. For each pgmpy class, make one class `Time<PgmpyClass>`. Make it a subclass of `benchmarks._bench.Bench`.
-2. For each method that the pgmpy class defines, make one method `time_<method>`. Do not measure inherited methods.
-3. Use only `time_` and `timeraw_` benchmarks.
-4. Some pgmpy classes have the same API, for example the scores and the CI tests. Measure them in one benchmark class
-   with `params`.
-5. Write each method that has no benchmark in the `Skipped:` list of the module docstring. Give one of these reasons:
-   `deprecated`, `plotting`, `trivial`, `llm`, `torch`, `abstract`, `internal`, `unsupported`, `infeasible`, `alias`.
-6. Do not add benchmarks for torch, LLM code, plots, or deprecated or private code. Also do not add benchmarks for
-   abstract `Base*` classes, `pgmpy.parameterization`, `SEMEstimator`, `FunctionalBayesianNetwork` or `FunctionalCPD`.
-7. In `setup`, make the inputs only from `benchmarks/_fixtures.py`. This file makes all inputs with pgmpy and fixed
-   seeds. Its only data file is `benchmarks/data/rocksample.pomdpx`.
-8. Keep `setup` fast. asv runs `setup` again before each measured call.
-9. If the method changes its inputs, make new objects in `setup` each time.
-10. Make the inputs the same for each run. Use `rng=0`, `show_progress=False` and a fixed rule to select the variables
-    and the evidence.
-11. Make sure that one call takes less than 0.5 s.
-12. Run your benchmarks with `-b <module>`. Refer to [Run benchmarks](#run-benchmarks).
+This example shows the structure of a benchmark module:
+
+```python
+"""Benchmarks for ``pgmpy.models``.
+
+Skipped:
+    DiscreteBayesianNetwork.states: trivial
+"""
+
+from benchmarks._bench import DISCRETE, ROWS, Bench
+from benchmarks._fixtures import discrete_bn
+
+
+class TimeDiscreteBayesianNetwork(Bench):  # One class for each pgmpy class.
+    def setup(self):  # asv runs setup again before each measured call. Keep it fast.
+        self.model = discrete_bn(DISCRETE)  # A new copy from _fixtures.py, because remove_node changes the model.
+        self.node = sorted(self.model.nodes)[0]  # A fixed rule to select the variables.
+
+    def time_get_markov_blanket(self):  # One method for each method that the class defines. Not inherited methods.
+        self.model.get_markov_blanket(self.node)
+
+    def time_remove_node(self):
+        self.model.remove_node(self.node)
+
+    def time_simulate(self):
+        self.model.simulate(n_samples=ROWS, rng=0, show_progress=False)
+```
+
+- Make the inputs only with `benchmarks/_fixtures.py`. If the method does not change its inputs, use one shared copy,
+  for example `discrete_bn.shared(DISCRETE)`.
+- Write each method that has no benchmark in the `Skipped:` list. Give one of these reasons: `deprecated`, `plotting`,
+  `trivial`, `llm`, `torch`, `abstract`, `internal`, `unsupported`, `infeasible`, `alias`.
+- Do not add benchmarks for torch, LLM code, plots, or deprecated or private code. Also do not add benchmarks for
+  abstract `Base*` classes, `pgmpy.parameterization`, `SEMEstimator`, `FunctionalBayesianNetwork` or `FunctionalCPD`.
+- Some pgmpy classes have the same API, for example the scores and the CI tests. Measure them in one class with
+  `params`. Refer to `benchmarks/structure_score.py`.
+- Use only `time_` and `timeraw_` benchmarks. Make sure that one call takes less than 0.5 s.
+- Run your benchmarks with `-b <module>`. Refer to [Run benchmarks](#run-benchmarks).
 
 **NOTE:** If a pgmpy commit changes a fixture, the two commits that asv compares can get different inputs.
 
