@@ -1,8 +1,4 @@
-"""Benchmarks for ``pgmpy.ci_tests``: ``is_independent`` for every test (param = test name), ``run_test`` once on ``Pearsonr``, ``get_ci_test``.
-
-Skipped:
-    GeneralizedCov.set_params: trivial
-"""
+"""Benchmarks for ``pgmpy.ci_tests``: only ``is_independent``, for every test (param = test name)."""
 
 from functools import cache
 
@@ -112,22 +108,3 @@ class TimeIndependenceMatch(Bench):
     def time_is_independent(self):
         self.test.is_independent(self.x, self.y, self.z)
 
-
-class TimeBaseCITest(Bench):
-    def setup(self):
-        self.test = ci_test("Pearsonr", gaussian_data, GAUSSIAN)
-        self.x, self.y, self.z = triple(gaussian_bn(GAUSSIAN))
-
-    def time_run_test(self):
-        self.test.run_test(self.x, self.y, self.z)
-
-
-class TimeCITestFunctions(Bench):
-    def setup(self):
-        self.data = gaussian_data(GAUSSIAN, ROWS)
-
-    def time_get_ci_test(self):
-        ci_tests.get_ci_test("pearsonr", self.data)
-
-    def time_get_ci_test_default(self):
-        ci_tests.get_ci_test(None, self.data)

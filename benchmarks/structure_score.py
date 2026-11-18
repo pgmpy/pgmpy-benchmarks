@@ -1,7 +1,5 @@
-"""Benchmarks for ``pgmpy.structure_score``: ``score`` and ``local_score`` per score (one class per data type, param = score name), ``BDs`` priors, ``get_scoring_method``.
-
-Skipped:
-    BDs.structure_prior_ratio, inherited structure_prior / structure_prior_ratio: trivial (constants)
+"""Benchmarks for ``pgmpy.structure_score``: only ``score`` and ``local_score``, for every score (one class per data
+type, param = score name).
 """
 
 from functools import cache
@@ -104,22 +102,3 @@ class TimeCondGaussScore(_Score):
     params = [["LogLikelihoodCondGauss", "AICCondGauss", "BICCondGauss"]]
     inputs = gaussian_bn, mixed_data, GAUSSIAN, ROWS
 
-
-class TimeBDs(Bench):
-    def setup(self):
-        self.model = discrete_bn.shared(DISCRETE)
-        self.scorer = make_scorer("BDs", discrete_data, DISCRETE, ROWS)
-
-    def time_structure_prior(self):
-        self.scorer.structure_prior(self.model)
-
-
-class TimeScoreFunctions(Bench):
-    def setup(self):
-        self.data = discrete_data(DISCRETE, ROWS)
-
-    def time_get_scoring_method(self):
-        structure_score.get_scoring_method("bdeu", self.data)
-
-    def time_get_scoring_method_default(self):
-        structure_score.get_scoring_method(None, self.data)

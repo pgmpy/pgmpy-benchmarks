@@ -1,9 +1,5 @@
-"""Benchmarks for ``pgmpy.identification``. ``Adjustment`` and ``Frontdoor`` run on the DAG only, ``Frontdoor`` on a
-``FRONTDOOR_NODES`` BFS prefix (its search is exponential when no set exists).
-
-Skipped:
-    ID.__call__, Adjustment.__call__, Frontdoor.__call__ (alias of ``identify``), constructors: trivial
-    ProbabilityNode.marginalize and the other tree-node classes: internal
+"""Benchmarks for ``pgmpy.identification``: only ``identify`` and ``validate``. ``Adjustment`` and ``Frontdoor`` run on
+the DAG only, ``Frontdoor`` on a ``FRONTDOOR_NODES`` BFS prefix (its search is exponential when no set exists).
 """
 
 from collections import defaultdict
@@ -116,11 +112,6 @@ def with_frontdoor(name, n_nodes):
     return Frontdoor().identify(causal_graph(name, n_nodes))[0]
 
 
-@cache
-def expression(name):
-    return ID().identify(causal_graph(name))
-
-
 class TimeID(Bench):
     def setup(self):
         self.admg = causal_graph("admg")
@@ -161,16 +152,3 @@ class TimeFrontdoor(Bench):
     def time_validate(self):
         self.frontdoor.validate(self.with_frontdoor)
 
-
-class TimeProbabilityExpressionTree(Bench):
-    def setup(self):
-        self.tree = expression(DAG_GRAPH)
-
-    def time_to_latex(self):
-        self.tree.to_latex()
-
-    def time_collect_node_types(self):
-        self.tree.collect_node_types()
-
-    def time_find_leaves(self):
-        self.tree.find_leaves()
