@@ -6,17 +6,80 @@ Skipped:
     ProbabilityNode.marginalize and the other tree-node classes: internal
 """
 
+from collections import defaultdict
 from functools import cache
 
 import networkx as nx
+import numpy as np
+from benchmarks._bench import Bench, fresh
 
-from benchmarks._fixtures import bfs_prefix, graph
-from benchmarks._bench import Bench
-
+from pgmpy.base import DAG, MAG
 from pgmpy.identification import ID, Adjustment, Frontdoor
 
+EDGE_PROB = 0.15
+GRAPH_NODES = 20
+LATENT_FRACTION = 0.1
 DAG_GRAPH = "dag"
 FRONTDOOR_NODES = 12
+
+
+@fresh
+def graph(kind):
+    if kind in ("admg", "mag"):
+        admg = _admg(GRAPH_NODES)
+        return admg if kind == "admg" else _mag(admg)
+    dag = DAG.get_random(n_nodes=GRAPH_NODES, edge_prob=EDGE_PROB, rng=0)
+    return {"dag": lambda: dag, "pdag": dag.to_pdag, "ug": dag.moralize, "perturbed": lambda: _perturbed(dag)}[kind]()
+
+
+def _admg(n):
+    n_latent = max(1, round(n * LATENT_FRACTION))
+    dag = DAG.get_random(n_nodes=n + n_latent, edge_prob=EDGE_PROB, rng=0)
+    dag.latents = set(np.random.default_rng(0).choice(list(dag.nodes()), size=n_latent, replace=False).tolist())
+    return dag.to_admg()
+
+
+def _mag(admg):
+    ancestors = {v: admg.get_ancestors(v) for v in admg.nodes()}
+    edges = [
+        (u, v, t)
+        for u, v, t in admg.get_edges(data=True)
+        if t == "->" or (u not in ancestors[v] and v not in ancestors[u])
+    ]
+    mag = MAG(edge_list=edges)
+    mag.add_nodes_from(admg.nodes())
+    return mag
+
+
+def _perturbed(dag, fraction=0.1, rng=0):
+    edges = sorted(dag.edges())
+    n = round(fraction * len(edges))
+    picked = np.random.default_rng(rng).permutation(len(edges))[: 2 * n]
+    removed = {edges[i] for i in picked[n:]}
+    out = DAG([e for e in edges if e not in removed])
+    out.add_nodes_from(dag.nodes())
+    for u, v in sorted(edges[i] for i in picked[:n]):
+        out.remove_edge(u, v)
+        out.add_edge(*((u, v) if nx.has_path(out, u, v) else (v, u)))
+    return out
+
+
+def bfs_prefix(edges, start, n_nodes):
+    neighbours = defaultdict(set)
+    for p, c in edges:
+        neighbours[p].add(c)
+        neighbours[c].add(p)
+    order, seen, queue = [], set(), list(start)
+    while queue and len(order) < n_nodes:
+        node = queue.pop(0)
+        if node in seen:
+            continue
+        seen.add(node)
+        order.append(node)
+        queue.extend(sorted(neighbours[node] - seen))
+    dag = DAG([(p, c) for p, c in edges if p in seen and c in seen])
+    dag.add_nodes_from(order)
+    return dag
 
 
 def descendants(g, node):

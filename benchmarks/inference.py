@@ -11,21 +11,11 @@ import copy
 from functools import cache
 
 import networkx as nx
-from benchmarks._fixtures import (
-    dbn,
-    dbn_spec,
-    discrete_bn,
-    discrete_data,
-    first_states,
-    gaussian_bn,
-    gaussian_data,
-    junction_tree,
-    pairwise_markov_network,
-    tree_factor_graph,
-)
-from benchmarks._bench import DISCRETE, GAUSSIAN, MODEL, ROWS, Bench
-from benchmarks.models import DBN_VARS
+import numpy as np
+from benchmarks._bench import Bench, fresh
 
+from pgmpy.example_models import load_model
+from pgmpy.factors.discrete import DiscreteFactor, TabularCPD
 from pgmpy.inference import (
     ApproxInference,
     BeliefPropagation,
@@ -36,11 +26,149 @@ from pgmpy.inference import (
     VariableElimination,
 )
 from pgmpy.inference.EliminationOrder import MinNeighbors
+from pgmpy.models import DiscreteMarkovNetwork, DynamicBayesianNetwork, FactorGraph, LinearGaussianBayesianNetwork
 
+ROWS = 1_000
+DISCRETE = "asia"
+GAUSSIAN = 8
+MODEL = "alarm"
+DBN_VARS = 5
 APPROX_SAMPLES = 500
 
 N_QUERY = 4
 N_EVIDENCE = 2
+
+
+def topological(model):
+    return list(nx.topological_sort(model))
+
+
+@fresh
+def discrete_bn(name):
+    return load_model(f"bnlearn/{name}")
+
+
+@fresh
+def gaussian_bn(n):
+    return LinearGaussianBayesianNetwork.get_random(n_nodes=n, edge_prob=0.3, rng=0)
+
+
+def first_states(model, nodes):
+    return {n: model.states[n][0] for n in nodes}
+
+
+def _cpds(name):
+    model = discrete_bn(name)
+    return [model.get_cpds(v) for v in topological(model)]
+
+
+def factor_graph_from(variables, fs):
+    fg = FactorGraph()
+    fg.add_nodes_from(variables)
+    fg.add_nodes_from(fs)
+    fg.add_factors(*fs)
+    fg.add_edges_from([(v, f) for f in fs for v in f.variables])
+    return fg
+
+
+def _reduced_factor(cpd, kept):
+    parents = cpd.variables[1:]
+    table = cpd.values
+    dropped = tuple(1 + i for i, p in enumerate(parents) if p not in kept)
+    if dropped:
+        table = table.mean(axis=dropped)
+    scope = [cpd.variable, *(p for p in parents if p in kept)]
+    return DiscreteFactor(scope, list(table.shape), table.ravel(), state_names={v: cpd.state_names[v] for v in scope})
+
+
+def pairwise_markov_network(name):
+    """Pairwise network for ``Mplp``: a factor per node and per BN edge, each CPD averaged over the other parents."""
+    cpds = _cpds(name)
+    edges, fs = [], []
+    for cpd in cpds:
+        fs.append(_reduced_factor(cpd, ()))
+        for p in cpd.variables[1:]:
+            fs.append(_reduced_factor(cpd, (p,)))
+            edges.append((p, cpd.variable))
+    model = DiscreteMarkovNetwork(edges)
+    model.add_nodes_from(cpd.variable for cpd in cpds)
+    model.add_factors(*fs)
+    return model
+
+
+@cache
+def _tree_kept_parents(name):
+    model = discrete_bn(name)
+    components, kept = nx.utils.UnionFind(), {}
+    for node in sorted(model.nodes()):
+        kept[node] = set()
+        for p in sorted(model.get_parents(node)):
+            if components[p] != components[node]:
+                components.union(p, node)
+                kept[node].add(p)
+    return kept
+
+
+def tree_factor_graph(name):
+    """Loop-free factor graph for ``BeliefPropagationWithMessagePassing``: each node keeps the parents that close no cycle."""
+    kept = _tree_kept_parents(name)
+    cpds = _cpds(name)
+    return factor_graph_from([cpd.variable for cpd in cpds], [_reduced_factor(cpd, kept[cpd.variable]) for cpd in cpds])
+
+
+def junction_tree(name):
+    return discrete_bn(name).to_junction_tree()
+
+
+@fresh
+def discrete_data(name, n_rows, seed=0):
+    model = discrete_bn(name)
+    return model.simulate(n_rows, rng=seed, show_progress=False)[topological(model)]
+
+
+@fresh
+def gaussian_data(name, n_rows, seed=0):
+    model = gaussian_bn(name)
+    return model.simulate(n_rows, rng=seed)[topological(model)]
+
+
+@cache
+def dbn_spec(n_vars, intra_prob=0.4, inter_prob=0.3, interface_every=2, n_states=2):
+    """2-TBN with numpy CPDs (``DynamicBayesianNetwork.get_random`` breaks ``DBNInference``). The chain ``V(j-1) -> Vj``
+    keeps a slice connected for the junction tree. Only every ``interface_every``-th variable has inter-slice edges, so
+    sources match targets (``backward_inference``); the others have the same parents in both slices."""
+    rng = np.random.default_rng(0)
+    names = [f"V{i}" for i in range(n_vars)]
+    intra = {j: [i for i in range(j) if rng.random() < intra_prob or i == j - 1] for j in range(n_vars)}
+    interface = range(0, n_vars, interface_every)
+    inter = {j: [i for i in interface if i == j or rng.random() < inter_prob] if j in interface else [] for j in range(n_vars)}
+    nodes = []
+    for t in (0, 1):
+        for j in range(n_vars):
+            parents = [(names[i], t) for i in intra[j]] + ([(names[i], 0) for i in inter[j]] if t else [])
+            values = rng.dirichlet(np.ones(n_states), size=n_states ** len(parents)).T
+            nodes.append({"name": (names[j], t), "parents": parents, "values": values})
+    return {"n_states": n_states, "variables": names, "nodes": nodes}
+
+
+def dbn(n_vars):
+    spec = dbn_spec(n_vars)
+    k = spec["n_states"]
+    model = DynamicBayesianNetwork()
+    model.add_nodes_from(spec["variables"])
+    model.add_edges_from([(p, n["name"]) for n in spec["nodes"] for p in n["parents"]])
+    model.add_cpds(
+        *[
+            TabularCPD(n["name"], k, n["values"], evidence=n["parents"] or None, evidence_card=[k] * len(n["parents"]) or None)
+            for n in spec["nodes"]
+        ]
+    )
+    return model
+
+
+# Load at import: asv's forkserver imports the benchmarks once and forks each benchmark process from it.
+for _name in (DISCRETE, MODEL):
+    discrete_bn(_name)
 
 
 def split(nodes, roots):

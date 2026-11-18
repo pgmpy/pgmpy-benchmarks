@@ -7,33 +7,14 @@ Skipped:
     MarkovChain.is_stationarity: infeasible (draws a 10000-row sample per state: 32 s for 20 x 5)
 """
 
+from functools import cache
+
 import networkx as nx
 import numpy as np
-from benchmarks._fixtures import (
-    dbn,
-    bare,
-    dbn_data,
-    discrete_bn,
-    discrete_data,
-    factor_graph,
-    factor_graph_from,
-    factors,
-    first_states,
-    gaussian_bn,
-    gaussian_data,
-    joint_chain,
-    junction_tree,
-    markov_chain,
-    markov_chain_matrices,
-    markov_chain_sample,
-    markov_network,
-    sem_inputs,
-    topological,
-)
-from benchmarks._bench import DISCRETE, GAUSSIAN, MODEL, ROWS, Bench
-from benchmarks.factors import PRODUCT_CELLS, product_prefix
+from benchmarks._bench import Bench, fresh
 
-from pgmpy.factors.discrete import State
+from pgmpy.example_models import load_model
+from pgmpy.factors.discrete import JointProbabilityDistribution, State, TabularCPD
 from pgmpy.models import (
     SEM,
     ClusterGraph,
@@ -48,6 +29,12 @@ from pgmpy.models import (
     SEMGraph,
 )
 
+ROWS = 1_000
+DISCRETE = "asia"
+GAUSSIAN = 8
+MODEL = "alarm"
+DBN_SLICES = 3
+PRODUCT_CELLS = 20_000
 INDEPENDENCE_NODES = 5
 FREE_VARIABLES = 3
 MISSING_COLUMNS = 2
@@ -62,6 +49,251 @@ DBN_SIMULATE_SAMPLES = 500
 NEW_NODES = 10
 CHAIN_SIZE = (3, 3)
 SEM_ERR_CORR = 1
+
+
+def topological(model):
+    return list(nx.topological_sort(model))
+
+
+@fresh
+def discrete_bn(name):
+    return load_model(f"bnlearn/{name}")
+
+
+@fresh
+def gaussian_bn(n):
+    return LinearGaussianBayesianNetwork.get_random(n_nodes=n, edge_prob=0.3, rng=0)
+
+
+def bare(model):
+    b = type(model)(model.edges())
+    b.add_nodes_from(model.nodes)
+    return b
+
+
+def first_states(model, nodes):
+    return {n: model.states[n][0] for n in nodes}
+
+
+def _cpds(name):
+    model = discrete_bn(name)
+    return [model.get_cpds(v) for v in topological(model)]
+
+
+def factors(name):
+    return [cpd.to_factor() for cpd in _cpds(name)]
+
+
+def markov_network(name):
+    return discrete_bn(name).to_markov_model()
+
+
+def factor_graph(name):
+    return factor_graph_from(topological(discrete_bn(name)), factors(name))
+
+
+def factor_graph_from(variables, fs):
+    fg = FactorGraph()
+    fg.add_nodes_from(variables)
+    fg.add_nodes_from(fs)
+    fg.add_factors(*fs)
+    fg.add_edges_from([(v, f) for f in fs for v in f.variables])
+    return fg
+
+
+def junction_tree(name):
+    return discrete_bn(name).to_junction_tree()
+
+
+def joint_chain(n_vars, seed=0):
+    """Binary chain X0 -> X1 -> ... as (JointProbabilityDistribution, DiscreteBayesianNetwork), the network an I-map of the joint."""
+    rng = np.random.default_rng(seed)
+    names = [f"X{i}" for i in range(n_vars)]
+    root = rng.dirichlet([1, 1])  # P(X0)
+    cpts = [rng.dirichlet([1, 1], size=2).T for _ in range(n_vars - 1)]
+    joint = root
+    for cpt in cpts:
+        joint = joint[..., None] * cpt.T  # axes: X0, ..., X(i-1), Xi
+    model = DiscreteBayesianNetwork([(names[i], names[i + 1]) for i in range(n_vars - 1)])
+    model.add_cpds(
+        TabularCPD(names[0], 2, root.reshape(2, 1)),
+        *[
+            TabularCPD(names[i + 1], 2, cpt, evidence=[names[i]], evidence_card=[2])
+            for i, cpt in enumerate(cpts)
+        ],
+    )
+    return JointProbabilityDistribution(names, [2] * n_vars, joint.ravel()), model
+
+
+@fresh
+def discrete_data(name, n_rows, seed=0):
+    model = discrete_bn(name)
+    return model.simulate(n_rows, rng=seed, show_progress=False)[topological(model)]
+
+
+@fresh
+def gaussian_data(name, n_rows, seed=0):
+    model = gaussian_bn(name)
+    return model.simulate(n_rows, rng=seed)[topological(model)]
+
+
+@fresh
+def sem_inputs(name, n_err_corr):
+    """SEM inputs on a gaussian model's edges: nodes with children are latent, edges pruned so ``to_standard_lisrel`` works."""
+    model = gaussian_bn(name)
+    cpds = [model.get_cpds(v) for v in topological(model)]
+    roots = {cpd.variable for cpd in cpds if not cpd.evidence}
+    coefficient = {(p, cpd.variable): float(c) for cpd in cpds for p, c in zip(cpd.evidence, cpd.beta[1:])}
+    changed = True
+    while changed:  # dropping edges can make new leaves
+        changed = False
+        has_child = {p for p, _ in coefficient}
+        for child in {c for _, c in coefficient if c not in has_child}:
+            parents = [p for p, c in coefficient if c == child]
+            if any(p in roots for p in parents) and not all(p in roots for p in parents):
+                for p in parents:
+                    if p not in roots:
+                        del coefficient[(p, child)]
+                changed = True
+    ebunch = list(coefficient)
+    used = {v for e in ebunch for v in e}
+    std = {cpd.variable: float(cpd.std) for cpd in cpds}
+    variables = [cpd.variable for cpd in cpds if cpd.variable in used]
+    index = {v: i for i, v in enumerate(variables)}
+    latents = [v for v in variables if v in {p for p, _ in ebunch}]
+    observed = [v for v in variables if v not in latents]
+    err_corr = [(observed[2 * k], observed[2 * k + 1]) for k in range(n_err_corr)]
+    n = len(variables)
+    B = np.zeros((n, n))
+    B_values = np.zeros((n, n))
+    for (p, c), value in coefficient.items():
+        B[index[c], index[p]] = 1
+        B_values[index[c], index[p]] = value
+    zeta = np.eye(n)
+    zeta_values = np.diag([std[v] ** 2 for v in variables])
+    for a, b in err_corr:
+        zeta[index[a], index[b]] = zeta[index[b], index[a]] = 1
+        cov = 0.1 * min(zeta_values[index[a], index[a]], zeta_values[index[b], index[b]])
+        zeta_values[index[a], index[b]] = zeta_values[index[b], index[a]] = cov
+    wedge_y = np.zeros((len(observed), n))
+    for row, v in enumerate(observed):
+        wedge_y[row, index[v]] = 1
+    # lavaan names are alphanumeric, and a regressor "111" would parse as an intercept ("y ~ 1").
+    plain = {v: "v" + v.replace("_", "") for v in variables}
+    lavaan = "\n".join(
+        f"{plain[c]} ~ {' + '.join(plain[p] for p, c2 in ebunch if c2 == c)}"
+        for c in variables
+        if any(c2 == c for _, c2 in ebunch)
+    )
+    xi = [v for v in latents if not B[index[v]].any()]
+    eta = [v for v in latents if v not in xi]
+    x = [v for v in observed if any(B[index[v], index[r]] for r in xi)]
+    y = [v for v in observed if v not in x]
+
+    def blocks(matrix_B, matrix_zeta):
+        def pick(m, rows, cols):
+            return m[np.ix_([index[r] for r in rows], [index[c] for c in cols])]
+
+        return {
+            "B": pick(matrix_B, eta, eta),
+            "gamma": pick(matrix_B, eta, xi),
+            "wedge_y": pick(matrix_B, y, eta),
+            "wedge_x": pick(matrix_B, x, xi),
+            "phi": pick(matrix_zeta, xi, xi),
+            "theta_e": pick(matrix_zeta, y, y),
+            "theta_del": pick(matrix_zeta, x, x),
+            "psi": pick(matrix_zeta, eta, eta),
+        }
+
+    return {
+        "ebunch": ebunch,
+        "lavaan": lavaan,
+        "var_names": {"eta": eta, "xi": xi, "y": y, "x": x},
+        "params": blocks(B, zeta),
+        "fixed_masks": blocks(B_values, zeta_values),
+        "latents": latents,
+        "err_corr": err_corr,
+        "variables": variables,
+        "B": B,
+        "zeta": zeta,
+        "wedge_y": wedge_y,
+        "B_values": B_values,
+        "zeta_values": zeta_values,
+    }
+
+
+@cache
+def dbn_spec(n_vars, intra_prob=0.4, inter_prob=0.3, interface_every=2, n_states=2):
+    """2-TBN with numpy CPDs (``DynamicBayesianNetwork.get_random`` breaks ``DBNInference``). The chain ``V(j-1) -> Vj``
+    keeps a slice connected for the junction tree. Only every ``interface_every``-th variable has inter-slice edges, so
+    sources match targets (``backward_inference``); the others have the same parents in both slices."""
+    rng = np.random.default_rng(0)
+    names = [f"V{i}" for i in range(n_vars)]
+    intra = {j: [i for i in range(j) if rng.random() < intra_prob or i == j - 1] for j in range(n_vars)}
+    interface = range(0, n_vars, interface_every)
+    inter = {j: [i for i in interface if i == j or rng.random() < inter_prob] if j in interface else [] for j in range(n_vars)}
+    nodes = []
+    for t in (0, 1):
+        for j in range(n_vars):
+            parents = [(names[i], t) for i in intra[j]] + ([(names[i], 0) for i in inter[j]] if t else [])
+            values = rng.dirichlet(np.ones(n_states), size=n_states ** len(parents)).T
+            nodes.append({"name": (names[j], t), "parents": parents, "values": values})
+    return {"n_states": n_states, "variables": names, "nodes": nodes}
+
+
+def dbn(n_vars):
+    spec = dbn_spec(n_vars)
+    k = spec["n_states"]
+    model = DynamicBayesianNetwork()
+    model.add_nodes_from(spec["variables"])
+    model.add_edges_from([(p, n["name"]) for n in spec["nodes"] for p in n["parents"]])
+    model.add_cpds(
+        *[
+            TabularCPD(n["name"], k, n["values"], evidence=n["parents"] or None, evidence_card=[k] * len(n["parents"]) or None)
+            for n in spec["nodes"]
+        ]
+    )
+    return model
+
+
+@fresh
+def dbn_data(n_vars, n_rows, seed=0):
+    return dbn(n_vars).simulate(n_rows, n_time_slices=DBN_SLICES, rng=seed, show_progress=False)
+
+
+def markov_chain_matrices(n_vars, n_states, seed=0):
+    rng = np.random.default_rng(seed)
+    return {f"X{i}": rng.dirichlet(np.ones(n_states), size=n_states) for i in range(n_vars)}
+
+
+def markov_chain(n_vars, n_states, seed=0):
+    matrices = markov_chain_matrices(n_vars, n_states, seed)
+    chain = MarkovChain(list(matrices), [n_states] * n_vars, start_state=[State(v, 0) for v in matrices])
+    for variable, matrix in matrices.items():
+        chain.add_transition_model(variable, matrix)
+    return chain
+
+
+@fresh
+def markov_chain_sample(n_vars, n_states, n_rows, seed=0):
+    return markov_chain(n_vars, n_states, seed).sample(size=n_rows, rng=seed + 1)
+
+
+def product_prefix(fs, max_cells):
+    """Longest prefix of the factors (sorted by scope) whose joint state space is <= max_cells."""
+    chosen, cards = [], {}
+    for f in sorted(fs, key=lambda f: f.variables):
+        merged = {**cards, **dict(zip(f.variables, f.cardinality))}
+        if chosen and np.prod(list(merged.values()), dtype=float) > max_cells:
+            break
+        chosen.append(f)
+        cards = merged
+    return chosen
+
+
+# Load at import: asv's forkserver imports the benchmarks once and forks each benchmark process from it.
+for _name in (DISCRETE, MODEL):
+    discrete_bn(_name)
 
 
 def prefix_factors(name, max_cells):

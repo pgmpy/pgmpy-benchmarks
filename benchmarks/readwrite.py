@@ -9,12 +9,15 @@ Skipped:
     PomdpXWriter.add_conditions, .add_parameter_dd, .__str__: internal
 """
 
+import random
 import tempfile
+from functools import cache
 from pathlib import Path
 
-from benchmarks._fixtures import discrete_bn, gaussian_bn, pomdpx_model_data, readwrite_text
-from benchmarks._bench import DISCRETE, GAUSSIAN, Bench
+from benchmarks._bench import Bench, fresh
 
+from pgmpy.example_models import load_model
+from pgmpy.models import LinearGaussianBayesianNetwork
 from pgmpy.readwrite import (
     BIFReader,
     BIFWriter,
@@ -33,6 +36,51 @@ from pgmpy.readwrite import (
     XMLBIFReader,
     XMLBIFWriter,
 )
+
+DISCRETE = "asia"
+GAUSSIAN = 8
+
+
+@fresh
+def discrete_bn(name):
+    return load_model(f"bnlearn/{name}")
+
+
+@fresh
+def gaussian_bn(n):
+    return LinearGaussianBayesianNetwork.get_random(n_nodes=n, edge_prob=0.3, rng=0)
+
+
+@cache
+def readwrite_text(fmt, name):
+    """A reader's input: ``name`` written by pgmpy's writer for ``fmt``."""
+    if fmt == "pomdpx":
+        return (Path(__file__).parent / "data" / f"{name}.pomdpx").read_text(encoding="utf-8")
+    if fmt == "json":
+        return str(LGBNJSONWriter(gaussian_bn(name)))
+    writers = {"bif": BIFWriter, "xmlbif": XMLBIFWriter, "xbn": XBNWriter, "xdsl": XDSLWriter, "net": NETWriter,
+               "uai": lambda model: UAIWriter(model, round_values=4)}  # UAIReader cannot parse "1e-05"
+    random.seed(0)  # XDSLWriter draws node positions from the global random module
+    return str(writers[fmt](discrete_bn(name)))
+
+
+@fresh
+def pomdpx_model_data(name):
+    reader = PomdpXReader(string=readwrite_text("pomdpx", name))
+    return {
+        "description": reader.get_description(),
+        "discount": str(reader.get_discount()),
+        "variables": reader.get_variables(),
+        "initial_state_belief": reader.get_initial_beliefs(),
+        "state_transition_function": reader.get_state_transition_function(),
+        "obs_function": reader.get_obs_function(),
+        "reward_function": reader.get_reward_function(),
+    }
+
+
+# Load at import: asv's forkserver imports the benchmarks once and forks each benchmark process from it.
+discrete_bn(DISCRETE)
+
 
 NAME = {"json": GAUSSIAN, "pomdpx": "rocksample"}
 

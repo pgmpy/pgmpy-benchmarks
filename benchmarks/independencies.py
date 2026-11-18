@@ -1,4 +1,4 @@
-"""Benchmarks for ``pgmpy.independencies``. Inputs are ``_fixtures.independencies``: ``closure`` is exponential, so the
+"""Benchmarks for ``pgmpy.independencies``. Inputs are ``independencies()``: ``closure`` is exponential, so the
 fixture is 5 assertions over 7 variables.
 
 Skipped:
@@ -7,10 +7,24 @@ Skipped:
 
 from functools import cache
 
-from benchmarks._fixtures import independencies
-from benchmarks._bench import Bench
+import numpy as np
+from benchmarks._bench import Bench, fresh
 
 from pgmpy.independencies import IndependenceAssertion, Independencies
+
+
+@fresh
+def independencies():
+    rng = np.random.default_rng(0)
+    names = [f"V{i}" for i in range(7)]
+    assertions = []
+    while len(assertions) < 5:
+        a, b, c = int(rng.integers(1, 3)), int(rng.integers(1, 4)), int(rng.integers(0, 3))
+        pick = [str(v) for v in rng.choice(names, size=a + b + c, replace=False)]
+        assertion = [sorted(pick[:a]), sorted(pick[a : a + b]), sorted(pick[a + b :])]
+        if assertion not in assertions:
+            assertions.append(assertion)
+    return Independencies(*assertions)
 
 
 @cache

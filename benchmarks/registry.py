@@ -1,9 +1,9 @@
 """Benchmarks for ``pgmpy.registry``."""
 
+
 from benchmarks._bench import Bench
 
 from pgmpy.registry import all_tags, check_tag_is_valid
-
 
 CALLS = 100  # one call takes ~1 us, near the clock resolution
 

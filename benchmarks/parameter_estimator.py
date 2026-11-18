@@ -8,16 +8,56 @@ Skipped:
 import warnings
 from functools import cache
 
-from benchmarks._fixtures import bare, discrete_bn, discrete_data, gaussian_bn, gaussian_data
-from benchmarks._bench import DISCRETE, GAUSSIAN, ROWS, Bench
+import networkx as nx
+from benchmarks._bench import Bench, fresh
 from sklearn.exceptions import ConvergenceWarning
 
-from pgmpy.models import DiscreteBayesianNetwork
+from pgmpy.example_models import load_model
+from pgmpy.models import DiscreteBayesianNetwork, LinearGaussianBayesianNetwork
 from pgmpy.parameter_estimator import DiscreteBayesianEstimator, DiscreteEM, DiscreteMLE, LinearGaussianMLE
 
+ROWS = 1_000
+DISCRETE = "asia"
+GAUSSIAN = 8
 warnings.filterwarnings("ignore", category=ConvergenceWarning, message=r".*max_iter.*")
 
 EM_ITERATIONS = 5
+
+
+def topological(model):
+    return list(nx.topological_sort(model))
+
+
+@fresh
+def discrete_bn(name):
+    return load_model(f"bnlearn/{name}")
+
+
+@fresh
+def gaussian_bn(n):
+    return LinearGaussianBayesianNetwork.get_random(n_nodes=n, edge_prob=0.3, rng=0)
+
+
+def bare(model):
+    b = type(model)(model.edges())
+    b.add_nodes_from(model.nodes)
+    return b
+
+
+@fresh
+def discrete_data(name, n_rows, seed=0):
+    model = discrete_bn(name)
+    return model.simulate(n_rows, rng=seed, show_progress=False)[topological(model)]
+
+
+@fresh
+def gaussian_data(name, n_rows, seed=0):
+    model = gaussian_bn(name)
+    return model.simulate(n_rows, rng=seed)[topological(model)]
+
+
+# Load at import: asv's forkserver imports the benchmarks once and forks each benchmark process from it.
+discrete_bn(DISCRETE)
 
 
 @cache

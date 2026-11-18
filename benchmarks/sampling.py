@@ -5,17 +5,53 @@ Skipped:
 """
 
 import warnings
+from functools import cache
 
-from benchmarks._fixtures import discrete_bn
-from benchmarks._bench import DISCRETE, MODEL, ROWS, Bench
-from benchmarks.factors import largest_cpd
-from benchmarks.inference import query_and_evidence
+from benchmarks._bench import Bench, fresh
 
+from pgmpy.example_models import load_model
 from pgmpy.factors.discrete import State
 from pgmpy.sampling import BayesianModelInference, BayesianModelSampling, GibbsSampling
 
+ROWS = 1_000
+DISCRETE = "asia"
+MODEL = "alarm"
+N_QUERY = 4
+N_EVIDENCE = 2
 warnings.filterwarnings("ignore", category=RuntimeWarning, message="invalid value encountered in divide")
 warnings.filterwarnings("ignore", category=UserWarning, message="At least one state name was not found")
+
+
+@fresh
+def discrete_bn(name):
+    return load_model(f"bnlearn/{name}")
+
+
+def first_states(model, nodes):
+    return {n: model.states[n][0] for n in nodes}
+
+
+def largest_cpd(model):
+    """CPD with the most values, ties broken by variable name."""
+    return max(discrete_bn(model).cpds, key=lambda c: (c.values.size, str(c.variable)))
+
+
+def split(nodes, roots):
+    return [n for n in nodes if n not in roots][:N_QUERY], nodes[-N_EVIDENCE:]
+
+
+@cache
+def query_and_evidence(name):
+    """The 4 first non-root nodes (sorted) and the last 2 nodes (sorted) at their first state."""
+    m = discrete_bn.shared(name)
+    query, last = split(sorted(m.nodes), set(m.get_roots()))
+    return query, first_states(m, last)
+
+
+# Load at import: asv's forkserver imports the benchmarks once and forks each benchmark process from it.
+for _name in (DISCRETE, MODEL):
+    discrete_bn(_name)
+
 
 REJECTION_ROWS = ROWS // 50
 GIBBS_ROWS = 500

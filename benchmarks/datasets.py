@@ -9,8 +9,8 @@ Skipped:
 from functools import cache
 
 from benchmarks._bench import Bench
-
 from huggingface_hub import constants
+
 from pgmpy.datasets import list_datasets, load_dataset
 from pgmpy.example_models import list_models, load_model
 

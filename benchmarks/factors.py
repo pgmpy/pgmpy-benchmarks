@@ -6,16 +6,11 @@ Skipped:
     DiscreteFactor.scope, TabularCPD.get_evidence, FactorDict.get_factors, JointProbabilityDistribution.pmap (empty stub): trivial
 """
 
+import networkx as nx
 import numpy as np
-from benchmarks._fixtures import (
-    discrete_bn,
-    discrete_data,
-    factors,
-    joint_chain,
-    random_factor,
-)
-from benchmarks._bench import MODEL, ROWS, Bench
+from benchmarks._bench import Bench, fresh
 
+from pgmpy.example_models import load_model
 from pgmpy.factors import (
     FactorDict,
     FactorSet,
@@ -32,11 +27,67 @@ from pgmpy.factors.discrete import (
     NoisyORCPD,
     TabularCPD,
 )
+from pgmpy.models import DiscreteBayesianNetwork
 
+ROWS = 1_000
+MODEL = "alarm"
 FACTOR_CARD = 3
 JOINT_VARS = 4
 PRODUCT_CELLS = 20_000
 SUM_PRODUCT_FACTORS = 30
+
+
+def topological(model):
+    return list(nx.topological_sort(model))
+
+
+@fresh
+def discrete_bn(name):
+    return load_model(f"bnlearn/{name}")
+
+
+def _cpds(name):
+    model = discrete_bn(name)
+    return [model.get_cpds(v) for v in topological(model)]
+
+
+def factors(name):
+    return [cpd.to_factor() for cpd in _cpds(name)]
+
+
+def random_factor(n_vars, card, seed=0):
+    values = np.random.default_rng(seed).random(card**n_vars)
+    return DiscreteFactor([f"V{i}" for i in range(n_vars)], [card] * n_vars, values)
+
+
+def joint_chain(n_vars, seed=0):
+    """Binary chain X0 -> X1 -> ... as (JointProbabilityDistribution, DiscreteBayesianNetwork), the network an I-map of the joint."""
+    rng = np.random.default_rng(seed)
+    names = [f"X{i}" for i in range(n_vars)]
+    root = rng.dirichlet([1, 1])  # P(X0)
+    cpts = [rng.dirichlet([1, 1], size=2).T for _ in range(n_vars - 1)]
+    joint = root
+    for cpt in cpts:
+        joint = joint[..., None] * cpt.T  # axes: X0, ..., X(i-1), Xi
+    model = DiscreteBayesianNetwork([(names[i], names[i + 1]) for i in range(n_vars - 1)])
+    model.add_cpds(
+        TabularCPD(names[0], 2, root.reshape(2, 1)),
+        *[
+            TabularCPD(names[i + 1], 2, cpt, evidence=[names[i]], evidence_card=[2])
+            for i, cpt in enumerate(cpts)
+        ],
+    )
+    return JointProbabilityDistribution(names, [2] * n_vars, joint.ravel()), model
+
+
+@fresh
+def discrete_data(name, n_rows, seed=0):
+    model = discrete_bn(name)
+    return model.simulate(n_rows, rng=seed, show_progress=False)[topological(model)]
+
+
+# Load at import: asv's forkserver imports the benchmarks once and forks each benchmark process from it.
+discrete_bn(MODEL)
 
 
 def largest_cpd(model):

@@ -49,13 +49,22 @@ Skipped:
     DiscreteBayesianNetwork.states: trivial
 """
 
-from benchmarks._bench import DISCRETE, ROWS, Bench
-from benchmarks._fixtures import discrete_bn
+from benchmarks._bench import Bench, fresh
+
+from pgmpy.example_models import load_model
+
+DISCRETE = "asia"
+ROWS = 1_000
+
+
+@fresh  # Each call gives a new copy. discrete_bn.shared() gives one shared copy.
+def discrete_bn(name):
+    return load_model(f"bnlearn/{name}")
 
 
 class TimeDiscreteBayesianNetwork(Bench):  # One class for each pgmpy class.
     def setup(self):  # asv runs setup again before each measured call. Keep it fast.
-        self.model = discrete_bn(DISCRETE)  # A new copy from _fixtures.py, because remove_node changes the model.
+        self.model = discrete_bn(DISCRETE)  # A new copy, because remove_node changes the model.
         self.node = sorted(self.model.nodes)[0]  # A fixed rule to select the variables.
 
     def time_get_markov_blanket(self):  # One method for each method that the class defines. Not inherited methods.
@@ -68,8 +77,9 @@ class TimeDiscreteBayesianNetwork(Bench):  # One class for each pgmpy class.
         self.model.simulate(n_samples=ROWS, rng=0, show_progress=False)
 ```
 
-- Make the inputs only with `benchmarks/_fixtures.py`. If the method does not change its inputs, use one shared copy,
-  for example `discrete_bn.shared(DISCRETE)`.
+- Make the inputs in the module. Do not import them from other modules, so that a change to one module does not change
+  the others. Only `Bench` and `fresh` come from `benchmarks/_bench.py`.
+- If the method does not change its inputs, use one shared copy, for example `discrete_bn.shared(DISCRETE)`.
 - Write each method that has no benchmark in the `Skipped:` list. Give one of these reasons: `deprecated`, `plotting`,
   `trivial`, `llm`, `torch`, `abstract`, `internal`, `unsupported`, `infeasible`, `alias`.
 - Do not add benchmarks for torch, LLM code, plots, or deprecated or private code. Also do not add benchmarks for
@@ -79,7 +89,7 @@ class TimeDiscreteBayesianNetwork(Bench):  # One class for each pgmpy class.
 - Use only `time_` and `timeraw_` benchmarks. Make sure that one call takes less than 0.5 s.
 - Run your benchmarks with `-b <module>`. Refer to [Run benchmarks](#run-benchmarks).
 
-**NOTE:** If a pgmpy commit changes a fixture, the two commits that asv compares can get different inputs.
+**NOTE:** If a pgmpy commit changes how an input is made, the two commits that asv compares can get different inputs.
 
 ## Nightly workflow
 
